@@ -17,6 +17,8 @@ dependencies = [
     "python-multipart>=0.0.9",
     "python-dotenv>=1.0",
     "rich>=13.9,<15",
+    # AgntID task-glue SDK (not on PyPI yet): task open/close, _task_id, denial parsing.
+    "agntid-sdk @ git+https://github.com/AGNTID-AI/agntid-python.git",
 ]
 
 [project.optional-dependencies]
