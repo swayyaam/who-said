@@ -77,6 +77,15 @@ deny contains msg if {
 	msg := sprintf("DENIED pay_upi: amount exceeds the limit of %d INR", [payment_limit_inr])
 }
 
+# Preferences can only be changed by the user's own API, never by an incoming message. Every call an
+# agent makes carries the id of the message it is handling (injected by WhoSaid), so the rule is:
+# any update_preferences call that originates from a message is denied.
+deny contains msg if {
+	input.tool == "update_preferences"
+	object.get(input.arguments, "message_id", "") != ""
+	msg := "DENIED update_preferences: preferences can only be changed by the user, never by an incoming message"
+}
+
 # ---- decision ---------------------------------------------------------------------------
 
 default allow := false

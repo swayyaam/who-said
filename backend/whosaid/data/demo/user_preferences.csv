@@ -1,0 +1,5 @@
+user_id,key,value
+u_109,mute_promotions,true
+u_107,never_mute_sender,u_110
+u_106,never_mute_group,g_102
+u_110,dnd_window,23:00-07:00

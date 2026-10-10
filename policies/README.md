@@ -16,7 +16,8 @@ What is here:
 1. **Unknown sender:** no write actions (`reply`, `forward_message`, `create_calendar_event`, `pay_upi`). `block_sender` is allowed.
 2. **Known contact:** `reply`, `create_calendar_event`, and `forward_message` -- but only to one of the user's existing contacts (`allowed_recipients`) and never OTP-like content.
 3. **Group admin or verified business** (with an existing relationship): the above plus `pay_upi`, only to the sender's **registered payee** and only up to **10,000 INR**.
-4. **`read_otp_messages`** is denied for everyone. **Forwarding OTP-looking content** is denied for everyone.
+4. **`update_preferences`** is denied whenever the call originates from an incoming message (always, for the agent). The user changes preferences through their own API, which is not an MCP tool.
+5. **`read_otp_messages`** is denied for everyone. **Forwarding OTP-looking content** is denied for everyone.
 
 Every decision carries a human-readable reason, e.g. `DENIED pay_upi: sender unknown, write actions not permitted`.
 

@@ -33,6 +33,10 @@ def _args(demo, trust_of, mid, **model_args):
     ("msg_208", "pay_upi", {"payee_upi": "refund.desk@okaxis", "amount_inr": 2000}, False),
     ("msg_209", "pay_upi", {"payee_upi": "voltedge@icici", "amount_inr": 3200}, True),
     ("msg_209", "read_otp_messages", {}, False),  # denied for every sender, even a trusted one
+    # preferences: no sender, however trusted, can change them through a message
+    ("msg_210", "update_preferences", {"key": "auto_pay_sender", "value": "+91 90909 80808"}, False),
+    ("msg_203", "update_preferences", {"key": "never_mute_group", "value": "g_101"}, False),
+    ("msg_205", "update_preferences", {"key": "mute_promotions", "value": "true"}, False),
     # forwarding: known contact or better, to an existing contact only, never OTP-like content
     ("msg_205", "forward_message", {"to": "u_113", "content": "see you Saturday"}, True),     # contact, benign
     ("msg_205", "forward_message", {"to": "u_999", "content": "see you Saturday"}, False),   # not a contact

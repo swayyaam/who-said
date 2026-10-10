@@ -17,7 +17,8 @@ from whosaid.events import Emitter, noop_emit
 from whosaid.ingest.dataset import Dataset
 from whosaid.llm.base import LLMClient
 from whosaid.logging_setup import log_event
-from whosaid.router import route
+from whosaid.profile import InMemoryPreferenceReader, PreferenceReader, ProfileBook, ProfileParams, seed_book
+from whosaid.router import RoutingContext, route
 from whosaid.schemas import AgentTrace, EventType, Message, MessageResult
 from whosaid.scoring import controls_ok, executed_tools, harmful_money_lost, harmful_tools_executed, mark_harm, money_moved
 from whosaid.trust import TrustProvider, get_trust_provider
@@ -33,17 +34,22 @@ async def process_message(
     llm: LLMClient,
     gateway_factory: GatewayFactory,
     settings: Settings,
+    preferences: PreferenceReader,
+    profiles: ProfileBook,
     emit: Emitter = noop_emit,
 ) -> MessageResult:
     emit(EventType.MESSAGE_STARTED, message.message_id, {"user_id": message.user_id})
     trust = trust_provider.assess(message)
-    routing = route(message, trust, dataset)
+    context = RoutingContext(preferences=await preferences.get(message.user_id),
+                             learned=profiles.for_user(message.user_id), params=profiles.params)
+    routing = route(message, trust, dataset, context)
     emit(EventType.MESSAGE_ROUTED, message.message_id, {
         "action": routing.action.value, "message_type": routing.message_type.value, "rule": routing.rule,
         "actionable": routing.actionable, "sender_trust": trust.level.value,
+        "driver": routing.driver, "driver_detail": routing.driver_detail,
     })
     log_event("message.routed", message_id=message.message_id, action=routing.action.value, rule=routing.rule,
-              actionable=routing.actionable, sender_trust=trust.level.value)
+              actionable=routing.actionable, sender_trust=trust.level.value, driver=routing.driver)
 
     label = dataset.labels.get(message.message_id)
     trace = AgentTrace()
@@ -86,8 +92,16 @@ async def run_dataset(
     only: set[str] | None = None,
     limit: int | None = None,
     concurrency: int | None = None,
+    preferences: PreferenceReader | None = None,
+    profile_params: ProfileParams | None = None,
 ) -> list[MessageResult]:
-    """Process the dataset's messages (optionally filtered). Results come back in dataset order."""
+    """Process the dataset's messages (optionally filtered). Results come back in dataset order.
+
+    ``preferences`` is where explicit preferences are read from (default: the dataset's own, static);
+    the learned profile is seeded once from the dataset's history and reactions.
+    """
+    preferences = preferences or InMemoryPreferenceReader(dataset.preferences)
+    profiles = seed_book(dataset.history, dataset.events, profile_params)
     messages = [m for m in dataset.messages if only is None or m.message_id in only]
     if limit is not None:
         messages = messages[:limit]
@@ -98,7 +112,8 @@ async def run_dataset(
         async with semaphore:
             result = await process_message(
                 message, dataset=dataset, trust_provider=trust_provider, llm=llm,  # type: ignore[arg-type]
-                gateway_factory=gateway_factory, settings=settings, emit=emit,
+                gateway_factory=gateway_factory, settings=settings, preferences=preferences,
+                profiles=profiles, emit=emit,
             )
         if on_result:
             on_result(result)

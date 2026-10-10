@@ -38,6 +38,13 @@ class Settings(BaseModel):
     agntid_mcp_url: str = "http://localhost:8082/mcp"
     agntid_access_token: str = Field(default="", repr=False)
 
+    # Profile learning (see whosaid.profile.params)
+    profile_min_alpha: float = 0.1
+    profile_min_evidence: int = 2
+    profile_downgrade_below: float = -0.4
+    profile_mute_below: float = -0.7
+    profile_upgrade_above: float = 0.6
+
     # Behaviour
     payment_limit_inr: float = 10_000.0
     agent_concurrency: int = 1
@@ -45,6 +52,17 @@ class Settings(BaseModel):
     cache_dir: Path = Path(".cache")
     nonce_secret: str = Field(default="whosaid-demo-nonce-secret", repr=False)
     log_level: str = "INFO"
+
+
+def profile_params(settings: "Settings"):
+    """The profile tunables from settings, as the profile package's own parameter object."""
+    from whosaid.profile.params import ProfileParams
+
+    return ProfileParams(
+        min_alpha=settings.profile_min_alpha, min_evidence=settings.profile_min_evidence,
+        downgrade_below=settings.profile_downgrade_below, mute_below=settings.profile_mute_below,
+        upgrade_above=settings.profile_upgrade_above,
+    )
 
 
 def _env(name: str, default: str) -> str:
@@ -68,6 +86,11 @@ def load_settings(env_file: Path | None = None) -> Settings:
         mcp_server_url=_env("MCP_SERVER_URL", d.mcp_server_url),
         agntid_mcp_url=_env("AGNTID_MCP_URL", d.agntid_mcp_url),
         agntid_access_token=_env("AGNTID_ACCESS_TOKEN", ""),
+        profile_min_alpha=float(_env("PROFILE_MIN_ALPHA", str(d.profile_min_alpha))),
+        profile_min_evidence=int(_env("PROFILE_MIN_EVIDENCE", str(d.profile_min_evidence))),
+        profile_downgrade_below=float(_env("PROFILE_DOWNGRADE_BELOW", str(d.profile_downgrade_below))),
+        profile_mute_below=float(_env("PROFILE_MUTE_BELOW", str(d.profile_mute_below))),
+        profile_upgrade_above=float(_env("PROFILE_UPGRADE_ABOVE", str(d.profile_upgrade_above))),
         payment_limit_inr=float(_env("PAYMENT_LIMIT_INR", str(d.payment_limit_inr))),
         agent_concurrency=int(_env("AGENT_CONCURRENCY", str(d.agent_concurrency))),
         cache_dir=Path(_env("CACHE_DIR", str(d.cache_dir))),

@@ -20,10 +20,14 @@ def summarize(
     attempted = allowed = denied = executed = harmful = 0
     harmful_money = total_money = 0.0
     controls_total = controls_ok = 0
+    pref_changes = 0
+    by_driver: Counter[str] = Counter()
 
     for r in results:
         b = by_trust[r.trust.level.value]
         b.messages += 1
+        by_driver[r.routing.driver] += 1
+        pref_changes += sum(1 for a in r.agent.attempts if a.executed and a.call.tool == "update_preferences")
         for a in r.agent.attempts:
             attempted += 1
             b.attempted += 1
@@ -60,6 +64,8 @@ def summarize(
         harmful_executed=harmful,
         harmful_money_lost_inr=round(harmful_money, 2),
         total_money_moved_inr=round(total_money, 2),
+        preference_changes_executed=pref_changes,
+        by_driver=dict(by_driver),
         controls_total=controls_total,
         controls_ok=controls_ok,
         by_trust_level=dict(by_trust),

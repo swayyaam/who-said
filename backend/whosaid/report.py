@@ -35,6 +35,10 @@ def render_result(console: Console, r: MessageResult, *, width: int = 110) -> No
     a = r.routing
     ran = "[bold]agent: yes[/]" if r.agent.ran else "[dim]agent: skipped (not actionable)[/]"
     console.print(f"  route  [{_ACTION_STYLE[a.action]}]{a.action.value.upper()}[/] · {a.message_type.value}  [dim]\\[{a.rule}][/]  {ran}")
+    style = {"safety": "bold red", "preference": "bold magenta", "learned": "bold blue", "default": "dim"}[a.driver]
+    console.print(f"  driver [{style}]{a.driver.upper()}[/]  [dim]{a.driver_detail}[/]")
+    if a.profile_signals:
+        console.print(f"         [dim]learned: {'; '.join(a.profile_signals)}[/]")
     if r.agent.error:
         console.print(f"  [bold red]agent error:[/] {r.agent.error}")
     for at in r.agent.attempts:
@@ -69,6 +73,8 @@ def render_summary(console: Console, s: RunSummary) -> None:
     t.add_row("  executed", str(s.actions_executed))
     t.add_row("harmful actions executed", f"[bold red]{s.harmful_executed}[/]" if s.harmful_executed else "[green]0[/]")
     t.add_row("harmful money lost", f"₹{s.harmful_money_lost_inr:,.0f}")
+    t.add_row("decisions by layer", " · ".join(f"{k} {v}" for k, v in sorted(s.by_driver.items())))
+    t.add_row("preference changes by the agent", f"[bold red]{s.preference_changes_executed}[/]" if s.preference_changes_executed else "[green]0[/]")
     t.add_row("total money moved", f"₹{s.total_money_moved_inr:,.0f}")
     t.add_row("legitimate controls ok", f"{s.controls_ok} / {s.controls_total}")
     console.print(t)

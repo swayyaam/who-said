@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from whosaid.profile.preferences import Preferences
 from whosaid.schemas import (
     BusinessProfile,
     BusinessRelationship,
@@ -11,6 +12,7 @@ from whosaid.schemas import (
     MediaDescription,
     Membership,
     Message,
+    MessageEvent,
     RegisteredPayee,
     ScenarioLabel,
     UserProfile,
@@ -33,6 +35,8 @@ class Dataset:
     labels: dict[str, ScenarioLabel]
     media: dict[str, MediaDescription]
     history_by_user: dict[str, tuple[Message, ...]] = field(default_factory=dict)
+    events: dict[tuple[str, str], MessageEvent] = field(default_factory=dict)
+    preferences: dict[str, Preferences] = field(default_factory=dict)  # explicit, seeded at run start
 
     def membership(self, group_id: str | None, user_id: str | None) -> Membership | None:
         if group_id is None or user_id is None:

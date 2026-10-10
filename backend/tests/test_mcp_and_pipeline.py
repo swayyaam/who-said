@@ -6,13 +6,14 @@ from conftest import ScriptedLLM, final, tool_calls
 from whosaid.agent.tool_gateway import DirectGateway
 from whosaid.mcp_server.server import build_server
 from whosaid.pipeline import process_message, run_dataset
+from whosaid.profile import InMemoryPreferenceReader, seed_book
 from whosaid.schemas import Enforcement, ToolCall
 from whosaid.summary import summarize
 from whosaid.trust import get_trust_provider
 from whosaid.tool_contract import TRUSTED_PARAMS, TOOL_NAMES
 
 
-async def test_server_exposes_six_tools_with_trusted_params_in_schema(server):
+async def test_server_exposes_every_tool_with_trusted_params_in_schema(server):
     async with DirectGateway(server) as gw:
         tools = {t.name: t for t in await gw.list_tools()}
     assert set(tools) == set(TOOL_NAMES)
@@ -98,6 +99,7 @@ async def test_events_are_emitted_in_order(demo, server, settings):
     message = next(m for m in demo.messages if m.message_id == "msg_203")
     await process_message(message, dataset=demo, trust_provider=get_trust_provider(message.channel, demo),
                           llm=_fooled_llm(), gateway_factory=lambda: DirectGateway(server), settings=settings,
+                          preferences=InMemoryPreferenceReader(), profiles=seed_book(demo.history, demo.events),
                           emit=lambda t, mid, data: seen.append(t.value))
     assert seen[0] == "message.started" and seen[1] == "message.routed" and seen[-1] == "message.completed"
     assert "tool.attempted" in seen and "authz.decision" in seen and "tool.executed" in seen

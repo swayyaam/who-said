@@ -9,6 +9,7 @@ Policy (from the product spec):
     the receiving user's existing contacts (allowed_recipients) and never OTP-like content
   * group admin / verified business: the same, plus pay_upi -- but only to that sender's
     registered payee and only up to PAYMENT_LIMIT_INR
+  * update_preferences: denied whenever the call originates from an incoming message
   * read_otp_messages, and forwarding anything that looks like an OTP: denied for everyone
 """
 
@@ -28,6 +29,12 @@ PAYMENT_CAPABLE = {"group_admin", "verified_business"}
 def decide(tool: str, args: dict[str, Any]) -> tuple[bool, str]:
     trust = args.get("sender_trust", "unknown") or "unknown"
 
+    if tool == "update_preferences":
+        # Every call an agent makes originates from an incoming message (message_id is injected by code).
+        # Preferences change only through the user's own API, never through a tool call.
+        if args.get("message_id"):
+            return False, f"DENIED {tool}: preferences can only be changed by the user, never by an incoming message"
+        return True, f"ALLOWED {tool}: no incoming message is involved"
     if tool == "read_otp_messages":
         return False, f"DENIED {tool}: OTP and verification-code messages are never readable by the agent"
     if tool == "block_sender":

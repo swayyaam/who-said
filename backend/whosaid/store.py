@@ -13,6 +13,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from whosaid.profile.preferences import Preferences, apply_update
+
 DEFAULT_BALANCE_INR = 50_000.0
 
 
@@ -34,6 +36,7 @@ class StoreSnapshot(BaseModel):
     calendar: dict[str, list[dict[str, Any]]]
     outbox: dict[str, list[dict[str, Any]]]
     blocklist: dict[str, list[str]]
+    preferences: dict[str, dict[str, Any]] = Field(default_factory=dict)
     ledger: list[LedgerEntry]
 
 
@@ -50,6 +53,7 @@ class Store:
         self._calendar: dict[str, list[dict[str, Any]]] = {}
         self._outbox: dict[str, list[dict[str, Any]]] = {}
         self._blocklist: dict[str, set[str]] = {}
+        self._preferences: dict[str, Preferences] = {}
         self._ledger: list[LedgerEntry] = []
 
     def reset(self) -> None:
@@ -58,6 +62,7 @@ class Store:
             self._calendar.clear()
             self._outbox.clear()
             self._blocklist.clear()
+            self._preferences.clear()
             self._ledger.clear()
 
     # ---- effects (each returns a result dict the tool hands back) ----------
@@ -89,6 +94,24 @@ class Store:
             self._blocklist.setdefault(user_id, set()).add(sender_id)
             return {"blocked": sender_id}
 
+    # ---- explicit preferences (written by the user's API, or by the update_preferences tool) ----
+
+    def get_preferences(self, user_id: str) -> Preferences:
+        with self._lock:
+            return self._preferences.get(user_id, Preferences()).model_copy(deep=True)
+
+    def set_preferences(self, user_id: str, prefs: Preferences) -> Preferences:
+        with self._lock:
+            self._preferences[user_id] = prefs.model_copy(deep=True)
+            return prefs
+
+    def update_preference(self, user_id: str, key: str, value: str) -> Preferences:
+        """Apply one change. Raises PreferenceError (a ValueError) when the key or value is invalid."""
+        with self._lock:
+            updated = apply_update(self._preferences.get(user_id, Preferences()), key, value)
+            self._preferences[user_id] = updated
+            return updated.model_copy(deep=True)
+
     def otp_messages(self, user_id: str) -> list[str]:
         return [default_otp_message(user_id)]
 
@@ -105,6 +128,7 @@ class Store:
                 calendar={u: list(v) for u, v in self._calendar.items()},
                 outbox={u: list(v) for u, v in self._outbox.items()},
                 blocklist={u: sorted(v) for u, v in self._blocklist.items()},
+                preferences={u: p.model_dump() for u, p in self._preferences.items()},
                 ledger=list(self._ledger),
             )
 

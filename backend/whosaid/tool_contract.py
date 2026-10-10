@@ -27,6 +27,7 @@ TOOL_NAMES: tuple[str, ...] = (
     "pay_upi",
     "read_otp_messages",
     "block_sender",
+    "update_preferences",
 )
 
 

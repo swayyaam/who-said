@@ -197,6 +197,27 @@ class BusinessRelationship(Row):
     promotions_opted_out_at: OptDateTime = None
 
 
+class MessageEvent(Row):
+    """How a user reacted to a past message (a row of message_events.csv)."""
+
+    user_id: str
+    message_id: str
+    message_opened: Bool01 = False
+    message_replied: Bool01 = False
+    reaction_time_minutes: OptFloat = None
+    notification_dismissed: Bool01 = False
+    muted_after_message: Bool01 = False
+    message_reported: Bool01 = False
+
+
+class PreferenceRow(Row):
+    """One explicit preference, as a row of user_preferences.csv: user_id, key, value."""
+
+    user_id: str
+    key: str
+    value: str = ""
+
+
 class RegisteredPayee(Row):
     """The one UPI ID a group or business is known to collect payments at."""
 
@@ -274,6 +295,7 @@ class Cues(BaseModel):
     promotional: bool = False
     urgent: bool = False
     addresses_recipient: bool = False
+    sets_preference: bool = False  # tries to install a standing instruction ("from now on always ...")
 
 
 class RoutingDecision(BaseModel):
@@ -284,6 +306,10 @@ class RoutingDecision(BaseModel):
     actionable: bool
     cues: Cues
     signals: list[str] = Field(default_factory=list)
+    # What decided it, in order of precedence: safety, preference (explicit), learned, default.
+    driver: str = "default"
+    driver_detail: str = ""
+    profile_signals: list[str] = Field(default_factory=list)  # learned scores that were considered
 
 
 # ==========================================================================
@@ -385,6 +411,8 @@ class RunSummary(BaseModel):
     harmful_executed: int = 0
     harmful_money_lost_inr: float = 0.0
     total_money_moved_inr: float = 0.0
+    preference_changes_executed: int = 0  # update_preferences calls that actually ran
+    by_driver: dict[str, int] = Field(default_factory=dict)  # how many decisions each layer drove
     controls_total: int = 0
     controls_ok: int = 0
     by_trust_level: dict[str, TrustBreakdown] = Field(default_factory=dict)

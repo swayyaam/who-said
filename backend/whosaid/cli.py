@@ -16,12 +16,13 @@ from pathlib import Path
 from rich.console import Console
 
 from whosaid.agent.gateways import gateway_factory
-from whosaid.config import DEMO_DATA_DIR, DEMO_FIXTURE_DIR, Settings, load_settings
+from whosaid.config import DEMO_DATA_DIR, DEMO_FIXTURE_DIR, Settings, load_settings, profile_params
 from whosaid.errors import WhoSaidError
 from whosaid.ingest import load_dataset_dir
 from whosaid.llm import build_llm
 from whosaid.logging_setup import setup_logging
-from whosaid.mcp_server.admin import ensure_tool_server
+from whosaid.mcp_server.admin import ServerPreferenceReader, ToolServerAdmin, ensure_tool_server
+from whosaid.profile import Preferences, PreferenceError, apply_update, seed_book
 from whosaid.pipeline import run_dataset
 from whosaid.report import render_result, render_summary
 from whosaid.schemas import Enforcement
@@ -41,9 +42,10 @@ async def _run(args: argparse.Namespace, settings: Settings, console: Console) -
     console.rule(f"[bold]WhoSaid[/] · dataset {dataset.name} ({len(dataset.messages)} messages) · AgntID {enforcement.value.upper()} · {llm.model}{' · demo fixture cache' if use_fixture else ''}")
     try:
         with ensure_tool_server(settings, spawn=not args.no_spawn) as admin:
-            admin.reset()
+            admin.reset_and_seed(dataset.preferences)
             results = await run_dataset(
                 dataset, llm=llm, gateway_factory=gateway_factory(settings, enforcement), settings=settings,
+                preferences=ServerPreferenceReader(admin), profile_params=profile_params(settings),
                 on_result=lambda r: render_result(console, r), only=set(args.only) if args.only else None,
                 limit=args.limit, concurrency=args.concurrency,
             )
@@ -52,8 +54,61 @@ async def _run(args: argparse.Namespace, settings: Settings, console: Console) -
         await llm.aclose()
     console.print()
     render_summary(console, summarize(results, enforcement=enforcement, model=llm.model, dataset_id=dataset.dataset_id))
+    _print_preference_changes(console, dataset.preferences, state.preferences)
     spent = sum(e.amount_inr for e in state.ledger if e.tool == "pay_upi" and e.status == "ok")
     console.print(f"[dim]tool-server ledger: ₹{spent:,.0f} actually paid out · {len(state.ledger)} effect(s) recorded[/]")
+    return 0
+
+
+def _print_preference_changes(console: Console, before: dict[str, Preferences], after: dict[str, dict]) -> None:
+    changed = [(u, Preferences.model_validate(p)) for u, p in after.items() if Preferences.model_validate(p) != before.get(u, Preferences())]
+    if not changed:
+        return
+    console.print("[bold red]explicit preferences were changed during the run:[/]")
+    for user, prefs in changed:
+        base = before.get(user, Preferences()).model_dump()
+        for key, value in prefs.model_dump().items():
+            if value != base[key]:
+                console.print(f"  {user}: {key} {base[key]!r} -> [bold]{value!r}[/]")
+
+
+def _cmd_prefs(args: argparse.Namespace, settings: Settings, console: Console) -> int:
+    """Show or change a user's explicit preferences on the running tool server (the user's own path)."""
+    admin = ToolServerAdmin(settings.mcp_server_url)
+    if not admin.healthy():
+        console.print(f"[bold red]no tool server at {settings.mcp_server_url}[/]; start it with: whosaid serve-mcp")
+        return 2
+    try:
+        prefs = admin.get_preferences(args.user)
+        if args.prefs_command == "set":
+            prefs = admin.put_preferences(args.user, apply_update(prefs, args.key, args.value))
+        elif args.prefs_command == "clear":
+            prefs = admin.put_preferences(args.user, Preferences())
+    except PreferenceError as exc:
+        console.print(f"[bold red]error:[/] {exc}")
+        return 2
+    console.print_json(prefs.model_dump_json())
+    return 0
+
+
+def _cmd_profile(args: argparse.Namespace, console: Console) -> int:
+    """Print the learned profile for a user, seeded from the dataset's history in one pass."""
+    from rich.table import Table
+
+    dataset = _resolve_dataset(args.dataset)
+    book = seed_book(dataset.history, dataset.events)
+    scores = book.for_user(args.user).snapshot()
+    t = Table(title=f"Learned profile · {args.user} · seeded from {len(dataset.history)} history message(s)")
+    for col in ("entity", "score", "interactions"):
+        t.add_column(col, justify="left" if col == "entity" else "right")
+    for key, s in sorted(scores.items(), key=lambda kv: kv[1].score):
+        style = "red" if s.score <= -0.4 else "green" if s.score >= 0.6 else ""
+        t.add_row(key, f"[{style}]{s.score:+.2f}[/]" if style else f"{s.score:+.2f}", str(s.n))
+    console.print(t if scores else f"[dim]no learned scores for {args.user}[/]")
+    prefs = dataset.preferences.get(args.user)
+    if prefs:
+        console.print("explicit preferences (from the dataset):")
+        console.print_json(prefs.model_dump_json())
     return 0
 
 
@@ -95,6 +150,17 @@ def main(argv: list[str] | None = None) -> int:
     fx.add_argument("--enforcement", choices=["off", "on", "both"], default="off")
     fx.add_argument("--merge", action="store_true", help="add to the existing fixture instead of replacing it")
     fx.add_argument("--no-spawn", action="store_true")
+    pf = sub.add_parser("prefs", help="show/set/clear a user's explicit preferences on the running tool server")
+    pf_sub = pf.add_subparsers(dest="prefs_command", required=True)
+    for name in ("show", "set", "clear"):
+        sp = pf_sub.add_parser(name)
+        sp.add_argument("user")
+        if name == "set":
+            sp.add_argument("key")
+            sp.add_argument("value")
+    pr = sub.add_parser("profile", help="print a user's learned profile (seeded from the dataset)")
+    pr.add_argument("user")
+    pr.add_argument("--dataset", default="demo")
     sub.add_parser("serve-mcp", help="run the MCP tool server")
     args = p.parse_args(argv)
 
@@ -114,6 +180,10 @@ def main(argv: list[str] | None = None) -> int:
         setup_logging(settings.log_level, stream=open(settings.cache_dir / "whosaid.log", "a", encoding="utf-8"))
     console = Console()
     try:
+        if args.command == "prefs":
+            return _cmd_prefs(args, settings, console)
+        if args.command == "profile":
+            return _cmd_profile(args, console)
         if args.command == "refresh-fixture":
             return asyncio.run(_refresh_fixture(args, settings, console))
         return asyncio.run(_run(args, settings, console))

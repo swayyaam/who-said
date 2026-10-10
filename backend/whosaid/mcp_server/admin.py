@@ -6,6 +6,7 @@ neither the agent nor the AgntID runtime can call them.
 
 from __future__ import annotations
 
+import asyncio
 import subprocess
 import sys
 import time
@@ -16,6 +17,7 @@ import httpx
 
 from whosaid.config import Settings
 from whosaid.errors import GatewayError
+from whosaid.profile.preferences import Preferences
 from whosaid.store import StoreSnapshot
 
 
@@ -32,10 +34,36 @@ class ToolServerAdmin:
     def reset(self) -> None:
         httpx.post(f"{self._base}/_admin/reset", timeout=5).raise_for_status()
 
+    def get_preferences(self, user_id: str) -> Preferences:
+        resp = httpx.get(f"{self._base}/_admin/preferences/{user_id}", timeout=5)
+        resp.raise_for_status()
+        return Preferences.model_validate(resp.json())
+
+    def put_preferences(self, user_id: str, prefs: Preferences) -> Preferences:
+        resp = httpx.put(f"{self._base}/_admin/preferences/{user_id}", json=prefs.model_dump(), timeout=5)
+        resp.raise_for_status()
+        return Preferences.model_validate(resp.json())
+
+    def reset_and_seed(self, preferences: dict[str, Preferences]) -> None:
+        """Start a run from a known state: wipe the store, then load the dataset's explicit preferences."""
+        self.reset()
+        for user_id, prefs in preferences.items():
+            self.put_preferences(user_id, prefs)
+
     def state(self) -> StoreSnapshot:
         resp = httpx.get(f"{self._base}/_admin/state", timeout=5)
         resp.raise_for_status()
         return StoreSnapshot.model_validate(resp.json())
+
+
+class ServerPreferenceReader:
+    """Reads explicit preferences from the tool server, where they canonically live."""
+
+    def __init__(self, admin: ToolServerAdmin) -> None:
+        self._admin = admin
+
+    async def get(self, user_id: str) -> Preferences:
+        return await asyncio.to_thread(self._admin.get_preferences, user_id)
 
 
 @contextmanager

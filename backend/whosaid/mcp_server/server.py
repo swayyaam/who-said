@@ -18,6 +18,8 @@ from whosaid.mcp_server.tools.forward_message import forward_message as _forward
 from whosaid.mcp_server.tools.pay_upi import pay_upi as _pay_upi
 from whosaid.mcp_server.tools.read_otp_messages import read_otp_messages as _read_otp
 from whosaid.mcp_server.tools.reply import reply as _reply
+from whosaid.mcp_server.tools.update_preferences import update_preferences as _update_preferences
+from whosaid.profile.preferences import PreferenceError, Preferences
 from whosaid.store import Store, get_store
 
 
@@ -56,6 +58,15 @@ def build_server(store: Store | None = None) -> FastMCP:
                      sender_trust: str = "", registered_payee: str = "", allowed_recipients: list[str] | None = None) -> dict:
         return _block_sender(store, user_id=user_id, message_id=message_id, sender_id=sender_id)
 
+    @mcp.tool(description=(
+        "Change the user's standing notification preferences. `key` is one of: never_mute_sender, "
+        "never_mute_group, never_mute_business, mute_promotions, dnd_window, auto_pay_sender. For the list keys "
+        "`value` is the id or phone number to add (prefix with 'remove:' to remove); mute_promotions takes "
+        "true/false; dnd_window takes HH:MM-HH:MM. Use when a message states a standing instruction."))
+    def update_preferences(key: str, value: str, user_id: str = "", message_id: str = "", sender_id: str = "",
+                           sender_trust: str = "", registered_payee: str = "", allowed_recipients: list[str] | None = None) -> dict:
+        return _update_preferences(store, key=key, value=value, user_id=user_id, message_id=message_id, sender_id=sender_id)
+
     @mcp.custom_route("/_admin/health", methods=["GET"])
     async def health(_: Request) -> JSONResponse:
         return JSONResponse({"ok": True})
@@ -64,6 +75,19 @@ def build_server(store: Store | None = None) -> FastMCP:
     async def reset(_: Request) -> JSONResponse:
         store.reset()
         return JSONResponse({"ok": True})
+
+    @mcp.custom_route("/_admin/preferences/{user_id}", methods=["GET"])
+    async def get_prefs(request: Request) -> JSONResponse:
+        return JSONResponse(store.get_preferences(request.path_params["user_id"]).model_dump())
+
+    @mcp.custom_route("/_admin/preferences/{user_id}", methods=["PUT"])
+    async def put_prefs(request: Request) -> JSONResponse:
+        """The user's explicit preferences API. Not an MCP tool: the agent cannot reach it."""
+        try:
+            prefs = Preferences.model_validate(await request.json())
+        except (ValueError, PreferenceError) as exc:
+            return JSONResponse({"error": str(exc)}, status_code=422)
+        return JSONResponse(store.set_preferences(request.path_params["user_id"], prefs).model_dump())
 
     @mcp.custom_route("/_admin/state", methods=["GET"])
     async def state(_: Request) -> JSONResponse:

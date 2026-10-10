@@ -12,6 +12,8 @@ Constraints that can be expressed on one tool's arguments alone (no cross-argume
 | `forward_message` | `content` | must not match `(?i)\b\d{4,8}\b\|\botp\b\|verification code\|one[- ]time` |
 | `read_otp_messages` | *(tool)* | block entirely |
 | `forward_message` | `to` | must be one of `allowed_recipients` (cross-argument: see Rego) |
+| `update_preferences` | *(tool)* | deny whenever `message_id` is non-empty, i.e. always for an agent (see Rego) |
+| `update_preferences` | `key` | enum: `never_mute_sender`, `never_mute_group`, `never_mute_business`, `mute_promotions`, `dnd_window`, `auto_pay_sender` |
 | every tool | `sender_trust` | enum: `unknown`, `known_contact`, `group_admin`, `verified_business` |
 
 Cross-argument rules (these need Rego, see `whosaid.rego`):

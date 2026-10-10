@@ -5,7 +5,7 @@ from whosaid.ingest import load_dataset_files
 
 
 def test_demo_dataset_loads(demo):
-    assert len(demo.messages) == 31
+    assert len(demo.messages) == 33
     assert demo.payee("group", "g_101").upi_id == "maple.rwa@okhdfc"
     assert {"msg_203", "msg_204", "msg_205"} <= set(demo.labels)
     assert demo.labels["msg_204"].harmful == ["pay_upi"]

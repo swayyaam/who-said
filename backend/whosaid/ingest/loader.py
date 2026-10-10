@@ -18,6 +18,7 @@ from pydantic import ValidationError
 
 from whosaid.errors import DatasetError
 from whosaid.ingest.dataset import Dataset
+from whosaid.profile.preferences import PreferenceError, Preferences, apply_update
 from whosaid.schemas import (
     BusinessProfile,
     BusinessRelationship,
@@ -26,6 +27,8 @@ from whosaid.schemas import (
     MediaDescription,
     Membership,
     Message,
+    MessageEvent,
+    PreferenceRow,
     RegisteredPayee,
     Row,
     ScenarioLabel,
@@ -43,12 +46,14 @@ FILE_SPECS: dict[str, tuple[type[Row], bool]] = {
     "business_accounts": (BusinessProfile, True),
     "user_business_history": (BusinessRelationship, True),
     "message_history": (Message, True),
+    "message_events": (MessageEvent, False),
+    "user_preferences": (PreferenceRow, False),
     "registered_payees": (RegisteredPayee, False),
     "scenario_labels": (ScenarioLabel, False),
     "media_descriptions": (MediaDescription, False),
 }
 # Part of the original schema; accepted but not needed by WhoSaid.
-IGNORED_FILES = {"message_events", "images", "voice_notes", "daily_notification_summary", "sample_messages", "output"}
+IGNORED_FILES = {"images", "voice_notes", "daily_notification_summary", "sample_messages", "output"}
 
 
 def _required_columns(model: type[Row]) -> list[str]:
@@ -158,6 +163,21 @@ def load_dataset_files(files: Mapping[str, bytes], *, name: str = "dataset") -> 
         if label_id not in known_ids:
             problems.append(f"scenario_labels.csv: {label_id!r} is not a message_id in messages.csv")
 
+    preferences: dict[str, Preferences] = {}
+    for row in parsed["user_preferences"]:  # type: ignore[assignment]
+        if row.user_id not in users:  # type: ignore[attr-defined]
+            problems.append(f"user_preferences.csv: user {row.user_id!r} is not in users.csv")  # type: ignore[attr-defined]
+            continue
+        try:
+            preferences[row.user_id] = apply_update(preferences.get(row.user_id, Preferences()), row.key, row.value)  # type: ignore[attr-defined]
+        except PreferenceError as exc:
+            problems.append(f"user_preferences.csv {row.user_id}/{row.key}: {exc}")  # type: ignore[attr-defined]
+    events = {(e.user_id, e.message_id): e for e in parsed["message_events"]}  # type: ignore[attr-defined]
+    history_ids = {(h.user_id, h.message_id) for h in history}
+    orphan = [k for k in events if k not in history_ids]
+    if orphan:
+        problems.append(f"message_events.csv: {len(orphan)} event(s) match no row of message_history.csv (first: {orphan[0]})")
+
     if problems:
         raise DatasetError(f"dataset {name!r} is invalid ({len(problems)} problem(s))", problems)
 
@@ -188,6 +208,8 @@ def load_dataset_files(files: Mapping[str, bytes], *, name: str = "dataset") -> 
         labels=labels,
         media=media,
         history_by_user={u: tuple(rows) for u, rows in by_user.items()},
+        events=events,
+        preferences=preferences,
     )
 
 
