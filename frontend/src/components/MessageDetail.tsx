@@ -64,6 +64,11 @@ export function MessageDetail({ r, onClose }: { r: MessageResult; onClose: () =>
   }, [onClose]);
 
   const signals = Object.entries(r.trust.signals);
+  // Older recorded fixtures lack denials_by_layer; derive it from the attempts.
+  const byLayer: Record<string, number> = r.denials_by_layer ?? r.agent.attempts.reduce<Record<string, number>>((acc, a) => {
+    if (!a.decision.allowed) acc[a.decision.layer] = (acc[a.decision.layer] ?? 0) + 1;
+    return acc;
+  }, {});
   return (
     <>
       <div className="fixed inset-0 z-30 bg-ink/40" onClick={onClose} aria-hidden />
@@ -99,10 +104,10 @@ export function MessageDetail({ r, onClose }: { r: MessageResult; onClose: () =>
           {r.agent.error && <p className="mt-3 rounded-md bg-pink p-3 text-[14px]">Agent error: {r.agent.error}</p>}
         </Block>
 
-        {r.denials_by_layer && Object.values(r.denials_by_layer).some((n) => n > 0) && (
+        {Object.values(byLayer).some((n) => n > 0) && (
           <div className="mt-6 flex flex-wrap items-center gap-2">
             <Eyebrow>Denied by layer</Eyebrow>
-            {Object.entries(r.denials_by_layer).filter(([, n]) => n > 0).map(([l, n]) => (
+            {Object.entries(byLayer).filter(([, n]) => n > 0).map(([l, n]) => (
               <span key={l} className="rounded-pill bg-lilac px-3 py-0.5 text-[13px] font-[540]"><span className="tabular">{n}</span> {l}</span>
             ))}
           </div>
