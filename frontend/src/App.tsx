@@ -48,14 +48,14 @@ export default function App() {
 
         <div className="mt-section">
           <Section eyebrow="Headline" title="What AgntID changes">
-            <ComparisonHero runs={d.runs} mock={api.mock} />
+            <ComparisonHero runs={d.runs} mock={api.mock} comparison={d.comparison} />
           </Section>
         </div>
 
         <Section eyebrow="Messages" title="Every message, and who sent it">
           {d.active ? (
             <MessagesTable results={d.active.results} filters={d.filters} setFilters={d.setFilters} selectedId={d.selectedId}
-              onSelect={d.setSelectedId} view={d.view} setView={d.setView} available={available} />
+              onSelect={d.setSelectedId} view={d.view} setView={d.setView} available={available} changed={d.comparison?.differing ? new Set(d.comparison.differing.map((x) => x.message_id)) : null} />
           ) : <Empty title="No results yet" body="Run the dataset to see each message, its sender trust level, routing and tool calls." />}
         </Section>
 

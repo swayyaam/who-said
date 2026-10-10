@@ -15,6 +15,10 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
     try {
       const body = await res.json();
       detail = body.detail ?? body.message ?? detail;
+      if (detail && typeof detail === "object" && "message" in detail) {
+        const d = detail as { message: string; problems?: string[] };
+        detail = [d.message, ...(d.problems ?? [])].join("; ");
+      }
     } catch { /* non-JSON error body */ }
     throw new Error(`${res.status} ${typeof detail === "string" ? detail : JSON.stringify(detail)}`);
   }

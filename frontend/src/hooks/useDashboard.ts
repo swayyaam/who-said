@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
-import type { Dataset, Enforcement, RunDetail, RunEvent } from "../types";
+import type { Dataset, Enforcement, MessageResult, RunComparison, RunDetail, RunEvent } from "../types";
+import { buildComparison } from "../lib/compare";
 
 export interface Progress {
   mode: Enforcement;
@@ -11,7 +12,9 @@ export interface Progress {
   denied: number;
 }
 
-export type Filters = { attacksOnly: boolean; deniedOnly: boolean; trust: string | "all" };
+export type Filters = { attacksOnly: boolean; deniedOnly: boolean; changedOnly: boolean; trust: string | "all" };
+const NO_FILTERS: Filters = { attacksOnly: false, deniedOnly: false, changedOnly: false, trust: "all" };
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export function useDashboard() {
   const [dataset, setDataset] = useState<Dataset | null>(null);
@@ -19,9 +22,11 @@ export function useDashboard() {
   const [enforcement, setEnforcement] = useState<Enforcement>("off");
   const [runs, setRuns] = useState<Partial<Record<Enforcement, RunDetail>>>({});
   const [progress, setProgress] = useState<Progress | null>(null);
+  const [comparison, setComparison] = useState<RunComparison | null>(null);
+  const runIds = useRef<Partial<Record<Enforcement, string>>>({});
   const [view, setView] = useState<Enforcement>("off");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [filters, setFilters] = useState<Filters>({ attacksOnly: false, deniedOnly: false, trust: "all" });
+  const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   const [error, setError] = useState<string | null>(null);
   const unsub = useRef<(() => void) | null>(null);
 
@@ -54,48 +59,75 @@ export function useDashboard() {
     const handle = await guard(() => api.startRun(dataset.dataset_id, mode));
     if (!handle) { setProgress(null); return; }
 
+    // Events go through a queue so a fixture replay (which finishes in under a second)
+    // is still visible; a live run's events arrive slower than the pace and pass straight through.
+    const queue: RunEvent[] = [];
+    let draining = false, closed = false, finished = false;
     const finish = async () => {
+      if (finished) return;
+      finished = true; closed = true;
       unsub.current?.(); unsub.current = null;
       const detail = await guard(() => api.getRun(handle.run_id));
       if (detail) {
+        runIds.current[mode] = handle.run_id;
         setRuns((r) => ({ ...r, [mode]: detail }));
         setView(mode);
+        setFilters(NO_FILTERS);
       }
       setProgress(null);
     };
 
-    const onEvent = (e: RunEvent) => {
+    const apply = (e: RunEvent) => {
       if (e.type === "run.started") {
-        const total = Number(e.data.messages ?? 0);
+        const total = Number(e.data.messages_total ?? e.data.messages ?? 0);
         if (total) setProgress((p) => p && { ...p, total });
       } else if (e.type === "message.started") {
-        setProgress((p) => p && { ...p, current: { messageId: e.message_id ?? "", text: String(e.data.text ?? ""), userId: String(e.data.user_id ?? "") } });
+        setProgress((p) => p && { ...p, current: { messageId: e.message_id ?? "", text: p.current?.messageId === e.message_id ? p.current.text : "", userId: String(e.data.user_id ?? "") } });
       } else if (e.type === "authz.decision" && e.data.allowed === false) {
         setProgress((p) => p && { ...p, denied: p.denied + 1 });
-      } else if (e.type === "tool.executed" && e.data.harmful) {
-        setProgress((p) => p && { ...p, harmful: p.harmful + 1 });
       } else if (e.type === "message.completed") {
-        setProgress((p) => p && { ...p, done: p.done + 1 });
-      } else if (e.type === "run.completed") {
-        void finish();
+        const r = e.data as unknown as MessageResult;
+        setProgress((p) => p && { ...p, done: p.done + 1, harmful: p.harmful + (r.harmful_executed?.length ?? 0), current: { messageId: e.message_id ?? "", text: r.text ?? "", userId: r.user_id ?? "" } });
       } else if (e.type === "run.failed") {
         setError(String(e.data.error ?? "The run failed."));
-        unsub.current?.(); setProgress(null);
+        closed = true; finished = true; unsub.current?.(); setProgress(null);
       }
     };
-    unsub.current = api.streamEvents(handle.run_id, onEvent, (err) => {
-      // Stream dropped: the run may still have finished, so try fetching the result once.
-      setError(err.message);
-      void finish();
+
+    const drain = async () => {
+      if (draining) return;
+      draining = true;
+      while (queue.length) {
+        const e = queue.shift()!;
+        if (finished) break;
+        apply(e);
+        if (e.type === "message.completed") await sleep(Math.min(150, 5000 / Math.max(1, dataset.messages)));
+        if (e.type === "run.completed") { await finish(); break; }
+      }
+      draining = false;
+      if (closed && !finished && !queue.length) await finish();
+    };
+
+    unsub.current = api.streamEvents(handle.run_id, (e) => { queue.push(e); void drain(); }, (err) => {
+      // Stream dropped: let queued events play out, then fetch the final result.
+      if (!finished) { closed = true; if (!queue.length && !draining) { setError(err.message); void finish(); } else void drain(); }
     });
   }, [dataset, enforcement, guard, progress]);
 
   const reset = useCallback(async () => {
     unsub.current?.(); unsub.current = null;
     await guard(() => api.reset());
-    setRuns({}); setProgress(null); setSelectedId(null); setView("off"); setEnforcement("off");
-    setFilters({ attacksOnly: false, deniedOnly: false, trust: "all" });
+    setRuns({}); setComparison(null); runIds.current = {}; setProgress(null); setSelectedId(null); setView("off"); setEnforcement("off");
+    setFilters(NO_FILTERS);
   }, [guard]);
+
+  useEffect(() => {
+    const off = runIds.current.off, on = runIds.current.on;
+    if (!runs.off || !runs.on || !off || !on) { setComparison(null); return; }
+    let ok = true;
+    api.compareRuns(off, on).then((c) => ok && setComparison(c)).catch(() => ok && setComparison(buildComparison(runs.off!, runs.on!)));
+    return () => { ok = false; };
+  }, [runs]);
 
   const active = runs[view] ?? null;
   const selected = useMemo(() => active?.results.find((r) => r.message_id === selectedId) ?? null, [active, selectedId]);
@@ -103,7 +135,7 @@ export function useDashboard() {
   return {
     dataset, datasetBusy, loadDemo, upload,
     enforcement, setEnforcement, run, reset, progress,
-    runs, view, setView, active, selected, selectedId, setSelectedId,
+    runs, comparison, view, setView, active, selected, selectedId, setSelectedId,
     filters, setFilters, error, clearError: () => setError(null),
   };
 }

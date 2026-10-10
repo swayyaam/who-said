@@ -10,15 +10,17 @@ function Pill({ on, onClick, children }: { on: boolean; onClick: () => void; chi
   );
 }
 
-export function applyFilters(rs: MessageResult[], f: Filters) {
-  return rs.filter((r) => (!f.attacksOnly || isAttack(r)) && (!f.deniedOnly || deniedCount(r) > 0) && (f.trust === "all" || r.trust.level === f.trust));
+export function applyFilters(rs: MessageResult[], f: Filters, changed: Set<string> | null) {
+  return rs.filter((r) => (!f.changedOnly || !changed || changed.has(r.message_id)) && (!f.attacksOnly || isAttack(r)) && (!f.deniedOnly || deniedCount(r) > 0) && (f.trust === "all" || r.trust.level === f.trust));
 }
 
-export function MessagesTable({ results, filters, setFilters, selectedId, onSelect, view, setView, available }: {
+export function MessagesTable({ results, filters, setFilters, selectedId, onSelect, view, setView, available, changed }: {
   results: MessageResult[]; filters: Filters; setFilters: (f: Filters) => void; selectedId: string | null;
   onSelect: (id: string) => void; view: Enforcement; setView: (v: Enforcement) => void; available: Enforcement[];
+  /** message ids whose outcome differs between OFF and ON (null until both runs exist) */
+  changed: Set<string> | null;
 }) {
-  const rows = applyFilters(results, filters);
+  const rows = applyFilters(results, filters, changed);
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -29,6 +31,7 @@ export function MessagesTable({ results, filters, setFilters, selectedId, onSele
             ))}
           </div>
         )}
+        {changed && <Pill on={filters.changedOnly} onClick={() => setFilters({ ...filters, changedOnly: !filters.changedOnly })}>What changed ({changed.size})</Pill>}
         <Pill on={filters.attacksOnly} onClick={() => setFilters({ ...filters, attacksOnly: !filters.attacksOnly })}>Attacks only</Pill>
         <Pill on={filters.deniedOnly} onClick={() => setFilters({ ...filters, deniedOnly: !filters.deniedOnly })}>Denied only</Pill>
         <span className="mx-1 h-5 w-px bg-hairline" />

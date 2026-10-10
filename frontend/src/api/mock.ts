@@ -3,8 +3,10 @@
 import offFixture from "../fixtures/off.json";
 import onFixture from "../fixtures/on.json";
 import type {
-  Dataset, Enforcement, EventType, MessageResult, Preferences, RunComparison, RunDetail, RunEvent, RunSummary,
+  Dataset, Enforcement, EventType, MessageResult, Preferences, PreferenceChange, RunComparison, RunDetail, RunEvent,
 } from "../types";
+import { findTamper, revert } from "../lib/prefs";
+import { buildComparison } from "../lib/compare";
 import type { WhoSaidApi } from "./types";
 
 const off = offFixture as unknown as RunDetail;
@@ -37,21 +39,27 @@ function lastPreferences(r: MessageResult): { user: string; prefs: Preferences }
   return p ? { user: r.user_id, prefs: p } : null;
 }
 
+function revertFor(r: MessageResult, after: Preferences): Preferences {
+  const t = findTamper([r]);
+  return t ? revert(after, t) : after;
+}
+
 function buildEvents(runId: string, detail: RunDetail): Omit<RunEvent, "seq" | "ts">[] {
   const ev = (type: EventType, message_id: string | null, data: Record<string, unknown> = {}) =>
     ({ run_id: runId, type, message_id, data });
-  const out = [ev("run.started", null, { messages: detail.results.length })];
+  const out = [ev("run.started", null, { messages_total: detail.results.length })];
   detail.results.forEach((r, i) => {
-    out.push(ev("message.started", r.message_id, { index: i + 1, total: detail.results.length, text: r.text, user_id: r.user_id }));
+    out.push(ev("message.started", r.message_id, { user_id: r.user_id }));
     out.push(ev("message.routed", r.message_id, { action: r.routing.action, driver: r.routing.driver }));
     r.agent.attempts.forEach((a) => {
       out.push(ev("tool.attempted", r.message_id, { tool: a.call.tool }));
-      out.push(ev("authz.decision", r.message_id, { tool: a.call.tool, allowed: a.decision.allowed, layer: a.decision.layer }));
-      if (a.executed) out.push(ev("tool.executed", r.message_id, { tool: a.call.tool, money_moved_inr: a.money_moved_inr, harmful: a.harmful }));
+      out.push(ev("authz.decision", r.message_id, { ...a.decision }));
+      if (a.executed) out.push(ev("tool.executed", r.message_id, { tool: a.call.tool, result: a.result }));
     });
-    out.push(ev("message.completed", r.message_id, { index: i + 1, total: detail.results.length }));
+    void i;
+    out.push(ev("message.completed", r.message_id, { ...r }));
   });
-  out.push(ev("run.completed", null, {}));
+  out.push(ev("run.completed", null, { summary: detail.summary }));
   return out;
 }
 
@@ -72,8 +80,19 @@ export const mockApi: WhoSaidApi = {
     prefs.clear(); // each real run reseeds the tool server, so preferences start clean
     const run_id = `mock_${enforcement}_${++counter}`;
     const src = enforcement === "on" ? on : off;
+    const changes: PreferenceChange[] = [];
+    for (const r of src.results) {
+      const p = lastPreferences(r);
+      if (p && enforcement === "off") {
+        const before = revertFor(r, p.prefs);
+        (Object.keys(p.prefs) as (keyof Preferences)[]).forEach((k) => {
+          if (JSON.stringify(p.prefs[k]) !== JSON.stringify(before[k])) changes.push({ user_id: p.user, key: k, before: before[k], after: p.prefs[k] });
+        });
+      }
+    }
     const detail: RunDetail = {
       status: "completed",
+      preference_changes: changes,
       results: src.results,
       summary: { ...src.summary, run_id },
     };
@@ -92,8 +111,7 @@ export const mockApi: WhoSaidApi = {
         const e = events[i];
         onEvent({ ...e, seq: i, ts: new Date().toISOString() });
         // pace per message, not per event, so 33 messages play in ~5s
-        if (e.type === "message.completed") await sleep(140);
-        else if (e.type === "run.started") await sleep(300);
+        if (e.type === "run.started") await sleep(300);
       }
       // OFF run really rewrites preferences; remember it so the preferences view shows it.
       if (stored.enforcement === "off") {
@@ -110,9 +128,9 @@ export const mockApi: WhoSaidApi = {
   },
 
   async compareRuns(offId, onId): Promise<RunComparison> {
-    const a = runs.get(offId)?.detail.summary as RunSummary, b = runs.get(onId)?.detail.summary as RunSummary;
+    const a = runs.get(offId)?.detail, b = runs.get(onId)?.detail;
     if (!a || !b) throw new Error("Both runs are required to compare.");
-    return { off: a, on: b };
+    return buildComparison(a, b);
   },
 
   async reset() { await sleep(200); runs.clear(); prefs.clear(); },

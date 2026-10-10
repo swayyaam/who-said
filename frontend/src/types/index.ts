@@ -109,6 +109,8 @@ export interface MessageResult {
   harmful_executed: string[];
   harmful_money_lost_inr: number;
   legit_actions_ok: boolean | null;
+  /** This message only: profile / policy / intent. */
+  denials_by_layer?: Record<string, number>;
 }
 
 export interface TrustBreakdown {
@@ -174,19 +176,56 @@ export interface Dataset {
   attacks?: number;
   controls?: number;
   is_demo?: boolean;
+  files?: string[];
+  fixture_available?: boolean;
 }
 
 export type RunStatus = "pending" | "running" | "completed" | "failed";
+
+export interface PreferenceChange {
+  user_id: string;
+  key: string;
+  before: unknown;
+  after: unknown;
+}
 
 export interface RunDetail {
   summary: RunSummary;
   results: MessageResult[];
   status?: RunStatus;
+  preference_changes?: PreferenceChange[];
+  run?: { run_id: string; live?: boolean; model?: string };
+}
+
+export interface DeniedCall { tool: string; layer: DecisionLayer; reason: string }
+export interface DifferingRow {
+  message_id: string;
+  scenario: string | null;
+  kind: ScenarioKind | null;
+  sender_trust: TrustLevel;
+  off: { executed_tools: string[]; harmful_executed: string[]; money_moved_inr: number };
+  on: { executed_tools: string[]; harmful_executed: string[]; money_moved_inr: number; denied: DeniedCall[] };
+}
+
+export interface ComparisonHeadline {
+  off_harmful_executed: number;
+  off_money_lost_inr: number;
+  on_harmful_executed: number;
+  on_money_lost_inr: number;
+  text: string;
+  loss_text: string;
+  on_controls_ok: number;
+  on_controls_total: number;
+  on_legit_paid_inr: number;
+  legit_text: string;
 }
 
 export interface RunComparison {
+  dataset_id?: string;
   off: RunSummary;
   on: RunSummary;
+  headline?: ComparisonHeadline;
+  differing?: DifferingRow[];
 }
 
 export interface Preferences {

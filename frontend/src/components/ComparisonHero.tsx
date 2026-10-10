@@ -1,4 +1,4 @@
-import type { Enforcement, RunDetail } from "../types";
+import type { Enforcement, RunComparison, RunDetail } from "../types";
 import { inr, runStats } from "../lib/format";
 import { Empty, Eyebrow } from "./ui";
 
@@ -28,7 +28,7 @@ function Layers({ run, empty }: { run?: RunDetail; empty?: boolean }) {
   );
 }
 
-export function ComparisonHero({ runs, mock }: { runs: Runs; mock: boolean }) {
+export function ComparisonHero({ runs, mock, comparison }: { runs: Runs; mock: boolean; comparison: RunComparison | null }) {
   const { off, on } = runs;
   if (!off && !on) {
     return <Empty title="No runs yet" body="Run the dataset with AgntID OFF, then flip the toggle and run it again with AgntID ON." />;
@@ -36,6 +36,7 @@ export function ComparisonHero({ runs, mock }: { runs: Runs; mock: boolean }) {
   const both = !!off && !!on;
   const lost = off?.summary.harmful_money_lost_inr ?? 0;
   const lostOn = on?.summary.harmful_money_lost_inr ?? 0;
+  const h = comparison?.headline;
   const so = off && runStats(off), sn = on && runStats(on);
 
   return (
@@ -48,11 +49,17 @@ export function ComparisonHero({ runs, mock }: { runs: Runs; mock: boolean }) {
         </div>
         <div className="t-display-xl tabular mt-4 flex flex-wrap items-baseline gap-x-6">
           {both ? (
-            <>
-              <span className="line-through decoration-[6px] decoration-magenta">{inr(lost)}</span>
-              <span aria-hidden>→</span>
-              <span>{inr(lostOn)}</span>
-            </>
+            h?.loss_text ? (
+              <span>{h.loss_text.split(" → ").map((part, i) => i === 0
+                ? <span key={i} className="line-through decoration-[6px] decoration-magenta">{part}</span>
+                : <span key={i}><span aria-hidden> → </span>{part}</span>)}</span>
+            ) : (
+              <>
+                <span className="line-through decoration-[6px] decoration-magenta">{inr(lost)}</span>
+                <span aria-hidden>→</span>
+                <span>{inr(lostOn)}</span>
+              </>
+            )
           ) : (
             <span>{inr(off ? lost : lostOn)}</span>
           )}
@@ -60,14 +67,12 @@ export function ComparisonHero({ runs, mock }: { runs: Runs; mock: boolean }) {
         {both && (
           <div className="mt-5 inline-flex flex-wrap items-center gap-x-3 rounded-pill bg-mint px-5 py-2 text-[18px] font-[540] text-ink">
             <span aria-hidden className="text-success">✓</span>
-            <span className="tabular">{on!.summary.controls_ok}/{on!.summary.controls_total} legitimate actions still work</span>
-            <span aria-hidden>·</span>
-            <span className="tabular">{inr(on!.summary.total_money_moved_inr - on!.summary.harmful_money_lost_inr)} paid correctly</span>
+            <span className="tabular">{h?.legit_text ?? `${on!.summary.controls_ok}/${on!.summary.controls_total} legitimate actions still work · ${inr(on!.summary.total_money_moved_inr - on!.summary.harmful_money_lost_inr)} paid correctly`}</span>
           </div>
         )}
         <p className="t-subhead mt-4 max-w-2xl">
           {both
-            ? `With AgntID ON every attack was stopped: ${sn!.attacksBlocked} of ${sn!.attacks} blocked, ${on!.summary.controls_ok} of ${on!.summary.controls_total} legitimate actions still went through.`
+            ? `With AgntID ON every attack was stopped: ${sn!.attacksBlocked} of ${sn!.attacks} attacks blocked.`
             : off
               ? `${off.summary.harmful_executed} harmful actions ran: money paid out, OTPs leaked, preferences rewritten. Flip the toggle and run again.`
               : "Nothing harmful ran. Run with AgntID OFF to see what it prevents."}

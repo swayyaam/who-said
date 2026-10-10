@@ -99,6 +99,15 @@ export function MessageDetail({ r, onClose }: { r: MessageResult; onClose: () =>
           {r.agent.error && <p className="mt-3 rounded-md bg-pink p-3 text-[14px]">Agent error: {r.agent.error}</p>}
         </Block>
 
+        {r.denials_by_layer && Object.values(r.denials_by_layer).some((n) => n > 0) && (
+          <div className="mt-6 flex flex-wrap items-center gap-2">
+            <Eyebrow>Denied by layer</Eyebrow>
+            {Object.entries(r.denials_by_layer).filter(([, n]) => n > 0).map(([l, n]) => (
+              <span key={l} className="rounded-pill bg-lilac px-3 py-0.5 text-[13px] font-[540]"><span className="tabular">{n}</span> {l}</span>
+            ))}
+          </div>
+        )}
+
         <div className={`mt-6 rounded-lg p-5 ${r.harmful_money_lost_inr > 0 ? "bg-coral" : "bg-soft"}`}>
           <Eyebrow>Money moved</Eyebrow>
           <div className="t-display-lg tabular mt-1">{inr(r.money_moved_inr)}</div>

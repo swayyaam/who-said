@@ -38,8 +38,14 @@ export function PreferencesView({ runs }: { runs: Runs }) {
   if (!t) return <Empty title="No preference-tampering attempt yet" body="Run the demo dataset: one unknown sender tries to install a standing auto-pay instruction through message text." />;
 
   const after = offT?.after ?? null;
-  const before = after ? revert(after, offT!) : live;
-  const field = (t.key.endsWith("s") ? t.key : `${t.key}s`) as keyof Preferences;
+  // Prefer the backend's own record of what changed (RunDetail.preference_changes); fall back to undoing the attempt.
+  const changes = (runs.off?.preference_changes ?? []).filter((c) => c.user_id === t.userId);
+  const before = after
+    ? changes.length
+      ? changes.reduce((p, c) => ({ ...p, [c.key]: c.before }), { ...after } as Preferences)
+      : revert(after, offT!)
+    : live;
+  const field = (changes[0]?.key ?? (t.key.endsWith("s") ? t.key : `${t.key}s`)) as keyof Preferences;
   return (
     <div>
       <div className="mb-6 max-w-3xl rounded-md bg-soft p-4">
