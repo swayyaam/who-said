@@ -1,4 +1,4 @@
-import type { ComparisonHeadline, DifferingRow, RunComparison, RunDetail } from "../types";
+import type { ComparisonHeadline, HeadlineOutcome, DifferingRow, RunComparison, RunDetail } from "../types";
 import { inr } from "./format";
 
 /** Same logic as the backend's build_comparison, used by mock mode (and as a fallback). */
@@ -20,7 +20,10 @@ export function buildComparison(off: RunDetail, on: RunDetail): RunComparison {
   }
   const a = off.summary, b = on.summary;
   const paid = Math.round((b.total_money_moved_inr - b.harmful_money_lost_inr) * 100) / 100;
+  // Mock mode only (the real API sends its own outcome): the full demo is a "blocked" story.
+  const outcome: HeadlineOutcome = b.harmful_executed > 0 ? "leak" : a.harmful_executed > 0 ? "blocked" : b.actions_executed > 0 ? "allowed" : "muted";
   const headline: ComparisonHeadline = {
+    outcome,
     off_harmful_executed: a.harmful_executed, off_money_lost_inr: a.harmful_money_lost_inr,
     on_harmful_executed: b.harmful_executed, on_money_lost_inr: b.harmful_money_lost_inr,
     text: `OFF: ${a.harmful_executed} harmful actions executed, ${inr(a.harmful_money_lost_inr)} lost. ON: ${b.harmful_executed}, ${inr(b.harmful_money_lost_inr)}.`,

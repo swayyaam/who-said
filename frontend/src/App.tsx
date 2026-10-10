@@ -41,7 +41,7 @@ export default function App() {
         )}
 
         <div className="grid gap-6 md:grid-cols-2">
-          <DatasetPanel dataset={d.dataset} busy={d.datasetBusy} onDemo={d.loadDemo} onUpload={d.upload} locked={running} />
+          <DatasetPanel dataset={d.dataset} datasets={d.datasets} busy={d.datasetBusy} onDemo={d.loadDemo} onSelect={d.selectDataset} onUpload={d.upload} locked={running} />
           <RunControls enforcement={d.enforcement} setEnforcement={d.setEnforcement} onRun={d.run} onReset={d.reset}
             progress={d.progress} finished={d.finished} hasDataset={!!d.dataset} hasRuns={available.length > 0} />
         </div>

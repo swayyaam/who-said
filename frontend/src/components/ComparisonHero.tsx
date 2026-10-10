@@ -38,46 +38,71 @@ export function ComparisonHero({ runs, mock, comparison }: { runs: Runs; mock: b
   const lostOn = on?.summary.harmful_money_lost_inr ?? 0;
   const h = comparison?.headline;
   const so = off && runStats(off), sn = on && runStats(on);
+  const pending = both && !comparison;
+  const outcome = h?.outcome ?? (both ? "blocked" : undefined);
+  // one run only, and nothing harmful in it
+  const single0 = !both && (off ?? on)!.summary.harmful_executed === 0;
+  // The big "₹X → ₹0" treatment is for stories where money was at risk (blocked) or still lost (leak).
+  const big = both ? outcome === "blocked" || outcome === "leak" : !single0;
+  const tone = both
+    ? ({
+        blocked: { bg: "bg-navy text-canvas", eyebrow: "Money lost to scams" },
+        leak: { bg: "bg-coral", eyebrow: "Money still lost with AgntID ON" },
+        allowed: { bg: "bg-mint", eyebrow: "Outcome · allowed" },
+        muted: { bg: "bg-cream", eyebrow: "Outcome · muted" },
+        quiet: { bg: "bg-cream", eyebrow: "Outcome · quiet" },
+      }[outcome ?? "blocked"] ?? { bg: "bg-cream", eyebrow: "Outcome" })
+    : single0
+      ? { bg: "bg-cream", eyebrow: `AgntID ${off ? "OFF" : "ON"} · outcome` }
+      : { bg: "bg-coral", eyebrow: off ? "AgntID OFF · money lost to scams" : "AgntID ON · money lost to scams" };
 
   return (
     <div className="fade-in">
-      {/* The demo moment */}
-      <div className={`rounded-lg p-8 md:p-12 ${both ? "bg-navy text-canvas" : "bg-coral"}`}>
-        <div className="flex items-center justify-between">
-          <Eyebrow>{both ? "Money lost to scams" : off ? "AgntID OFF · money lost to scams" : "AgntID ON · money lost to scams"}</Eyebrow>
-          {mock && <span className="t-eyebrow rounded-pill border border-current px-3 py-0.5">Recorded demo data</span>}
-        </div>
-        <div className="t-display-xl tabular mt-4 flex flex-wrap items-baseline gap-x-6">
-          {both ? (
-            h?.loss_text ? (
-              <span>{h.loss_text.split(" → ").map((part, i) => i === 0
-                ? <span key={i} className="line-through decoration-[6px] decoration-magenta">{part}</span>
-                : <span key={i}><span aria-hidden> → </span>{part}</span>)}</span>
-            ) : (
-              <>
-                <span className="line-through decoration-[6px] decoration-magenta">{inr(lost)}</span>
-                <span aria-hidden>→</span>
-                <span>{inr(lostOn)}</span>
-              </>
-            )
-          ) : (
-            <span>{inr(off ? lost : lostOn)}</span>
-          )}
-        </div>
-        {both && (
-          <div className="mt-5 inline-flex flex-wrap items-center gap-x-3 rounded-pill bg-mint px-5 py-2 text-[18px] font-[540] text-ink">
-            <span aria-hidden className="text-success">✓</span>
-            <span className="tabular">{h?.legit_text ?? `${on!.summary.controls_ok}/${on!.summary.controls_total} legitimate actions still work · ${inr(on!.summary.total_money_moved_inr - on!.summary.harmful_money_lost_inr)} paid correctly`}</span>
+      {/* The demo moment, styled by outcome */}
+      {pending ? (
+        <div className="flex min-h-[280px] items-center justify-center rounded-lg bg-soft p-8"><Eyebrow>Comparing runs…</Eyebrow></div>
+      ) : (
+        <div className={`rounded-lg p-8 md:p-12 ${tone.bg}`}>
+          <div className="flex items-center justify-between">
+            <Eyebrow>{tone.eyebrow}</Eyebrow>
+            {mock && <span className="t-eyebrow rounded-pill border border-current px-3 py-0.5">Recorded demo data</span>}
           </div>
-        )}
-        <p className="t-subhead mt-4 max-w-2xl">
-          {both
-            ? `With AgntID ON every attack was stopped: ${sn!.attacksBlocked} of ${sn!.attacks} attacks blocked.`
-            : off
-              ? `${off.summary.harmful_executed} harmful actions ran: money paid out, OTPs leaked, preferences rewritten. Flip the toggle and run again.`
-              : "Nothing harmful ran. Run with AgntID OFF to see what it prevents."}
-        </p>
-      </div>
+          {big ? (
+            <div className="t-display-xl tabular mt-4 flex flex-wrap items-baseline gap-x-6">
+              {!both ? (
+                <span>{inr(off ? lost : lostOn)}</span>
+              ) : h?.loss_text ? (
+                <span>{h.loss_text.split(" → ").map((part, i) => i === 0
+                  ? <span key={i} className={outcome === "leak" ? "" : "line-through decoration-[6px] decoration-magenta"}>{part}</span>
+                  : <span key={i}><span aria-hidden> → </span>{part}</span>)}</span>
+              ) : (
+                <>
+                  <span className="line-through decoration-[6px] decoration-magenta">{inr(lost)}</span>
+                  <span aria-hidden>→</span>
+                  <span>{inr(lostOn)}</span>
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="t-display-lg mt-4">{both ? h?.loss_text ?? "Nothing at risk" : single0 ? "Nothing at risk" : inr(off ? lost : lostOn)}</div>
+          )}
+          {both && h && (
+            <div className={`mt-5 inline-flex flex-wrap items-center gap-x-3 rounded-pill px-5 py-2 text-[18px] font-[540] text-ink ${h.on_controls_total > 0 ? (outcome === "blocked" || outcome === "leak" ? "bg-mint" : "bg-canvas") : "bg-canvas"}`}>
+              {h.on_controls_total > 0 && <span aria-hidden className="text-success">✓</span>}
+              <span className="tabular">{h.legit_text}</span>
+            </div>
+          )}
+          <p className="t-subhead mt-4 max-w-2xl">
+            {both
+              ? h?.text ?? ""
+              : single0
+                ? "No harmful action ran. Run the other mode to compare."
+                : off
+                  ? `${off.summary.harmful_executed} harmful actions ran: money paid out, OTPs leaked, preferences rewritten. Flip the toggle and run again.`
+                  : "Nothing harmful ran. Run with AgntID OFF to see what it prevents."}
+          </p>
+        </div>
+      )}
 
       {/* Side by side */}
       <div className="mt-6 rounded-lg border border-hairline p-6 md:px-8">

@@ -33,6 +33,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export function useDashboard() {
   const [dataset, setDataset] = useState<Dataset | null>(null);
   const [datasetBusy, setDatasetBusy] = useState(false);
+  const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [enforcement, setEnforcement] = useState<Enforcement>("off");
   const [runs, setRuns] = useState<Partial<Record<Enforcement, RunDetail>>>({});
   const [progress, setProgress] = useState<Progress | null>(null);
@@ -48,6 +49,12 @@ export function useDashboard() {
   const unsub = useRef<(() => void) | null>(null);
 
   useEffect(() => () => unsub.current?.(), []);
+  // built-in datasets (the full demo and the single-message cases) for the selector
+  useEffect(() => {
+    let ok = true;
+    api.listDatasets().then((l) => ok && setDatasets(l)).catch(() => undefined);
+    return () => { ok = false; };
+  }, []);
 
   const guard = useCallback(async <T,>(fn: () => Promise<T>): Promise<T | undefined> => {
     try { setError(null); return await fn(); }
@@ -60,6 +67,15 @@ export function useDashboard() {
     if (d) setDataset(d);
     setDatasetBusy(false);
   }, [guard]);
+
+  /** Switch to another built-in dataset. Earlier runs belong to the old one, so the view starts fresh. */
+  const selectDataset = useCallback((d: Dataset) => {
+    if (progress) return;
+    unsub.current?.(); unsub.current = null;
+    setDataset(d);
+    setRuns({}); setFinished(null); setComparison(null); runIds.current = {};
+    setSelectedId(null); setView("off"); setFilters(NO_FILTERS);
+  }, [progress]);
 
   const upload = useCallback(async (files: File[]) => {
     setDatasetBusy(true);
@@ -94,6 +110,8 @@ export function useDashboard() {
         setRuns((r) => ({ ...r, [mode]: detail }));
         setView(mode);
         setFilters(NO_FILTERS);
+        // a single-message dataset: open that message so the trust signals, chips and decision are on screen
+        if (detail.results.length === 1) setSelectedId(detail.results[0].message_id);
       }
       const p = progressRef.current;
       if (p && detail) {
@@ -171,7 +189,7 @@ export function useDashboard() {
   const selected = useMemo(() => active?.results.find((r) => r.message_id === selectedId) ?? null, [active, selectedId]);
 
   return {
-    dataset, datasetBusy, loadDemo, upload,
+    dataset, datasets, datasetBusy, loadDemo, selectDataset, upload,
     enforcement, setEnforcement, run, reset, progress, finished,
     runs, comparison, view, setView, active, selected, selectedId, setSelectedId,
     filters, setFilters, error, clearError: () => setError(null),

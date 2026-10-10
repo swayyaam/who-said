@@ -218,7 +218,12 @@ export interface ComparisonHeadline {
   on_controls_total: number;
   on_legit_paid_inr: number;
   legit_text: string;
+  /** what the comparison shows: blocked = harm stopped; allowed = a legitimate request went through;
+   *  muted = stopped by the router before the agent ran; quiet = nothing happened; leak = harm got through even with ON */
+  outcome?: HeadlineOutcome;
 }
+
+export type HeadlineOutcome = "allowed" | "blocked" | "muted" | "quiet" | "leak";
 
 export interface RunComparison {
   dataset_id?: string;
