@@ -1,7 +1,10 @@
+import { useEffect, useRef } from "react";
 import type { Enforcement } from "../types";
 import type { Finished, Progress } from "../hooks/useDashboard";
 import { Button, Eyebrow } from "./ui";
 import ThoughtLine from "./ThoughtLine";
+import { ToolChip } from "./ToolChip";
+import type { CallStatus } from "./CallChip";
 
 function Toggle({ value, onChange, disabled }: { value: Enforcement; onChange: (v: Enforcement) => void; disabled: boolean }) {
   const seg = (v: Enforcement, label: string) => (
@@ -22,6 +25,10 @@ export function RunControls({ enforcement, setEnforcement, onRun, onReset, progr
   progress: Progress | null; finished: Finished | null; hasDataset: boolean; hasRuns: boolean;
 }) {
   const running = !!progress;
+  const scroller = useRef<HTMLDivElement>(null);
+  const traceLen = progress?.trace.length ?? 0;
+  // keep the newest step in view inside the fixed-height trace box
+  useEffect(() => { const el = scroller.current; if (el && running) el.scrollTop = el.scrollHeight; }, [traceLen, running]);
   const shown = progress ?? finished;
   const pct = shown && shown.total ? Math.min(100, (shown.done / shown.total) * 100) : 0;
   return (
@@ -36,7 +43,7 @@ export function RunControls({ enforcement, setEnforcement, onRun, onReset, progr
       </div>
 
       {/* fixed-height progress area so nothing jumps; the trace scrolls inside it */}
-      <div className="mt-5 flex h-[236px] flex-col" aria-live="polite">
+      <div className="mt-5 flex h-[312px] flex-col" aria-live="polite">
         {shown ? (
           <>
             <div className="flex items-baseline justify-between">
@@ -44,7 +51,7 @@ export function RunControls({ enforcement, setEnforcement, onRun, onReset, progr
               <div className="t-eyebrow">AgntID {shown.mode}</div>
             </div>
             <div className="mt-2 h-2 shrink-0 overflow-hidden rounded-pill bg-hairline-soft"><div className="h-full rounded-pill bg-ink transition-[width] duration-200" style={{ width: `${pct}%` }} /></div>
-            <div className="mt-3 min-h-0 flex-1 overflow-y-auto">
+            <div ref={scroller} className="mt-3 min-h-0 flex-1 overflow-y-auto">
               <ThoughtLine
                 fontSize={16}
                 color="var(--color-ink)"
@@ -55,6 +62,15 @@ export function RunControls({ enforcement, setEnforcement, onRun, onReset, progr
                 steps={progress ? progress.trace : finished?.trace}
                 glyph="sparkle"
               />
+            </div>
+            {/* the current message's tool calls: running, then AgntID's verdict. Fixed height so nothing jumps. */}
+            <div className="mt-2 flex h-[72px] shrink-0 flex-wrap content-start gap-2 overflow-hidden" aria-label="Tool calls for the current message">
+              {progress?.current?.result?.agent.attempts.map((a, k): { a: typeof a; k: number; s: CallStatus } => {
+                const n = progress.trace.length;
+                return { a, k, s: n > 3 + 2 * k ? (a.decision.allowed ? "done" : "error") : n > 2 + 2 * k ? "running" : "idle" };
+              }).filter((c) => c.s !== "idle").map(({ a, k, s }) => (
+                <ToolChip key={`${progress.current?.messageId}-${k}`} attempt={a} status={s} showTimer={!progress.replay} />
+              ))}
             </div>
             <div className="mt-2 shrink-0 text-[13px]">
               <span className="tabular">{shown.harmful}</span> harmful ran · <span className="tabular">{shown.denied}</span> denied

@@ -8,7 +8,7 @@ export interface Progress {
   mode: Enforcement;
   done: number;
   total: number;
-  current: { messageId: string; text: string; userId: string } | null;
+  current: { messageId: string; text: string; userId: string; result?: MessageResult } | null;
   harmful: number;
   denied: number;
   /** the current message's pipeline, revealed step by step */
@@ -114,7 +114,7 @@ export function useDashboard() {
       } else if (e.type === "message.completed") {
         const r = e.data as unknown as MessageResult;
         const steps = buildSteps(r);
-        setProgress((p) => p && { ...p, current: { messageId: e.message_id ?? "", text: r.text ?? "", userId: r.user_id ?? "" } });
+        setProgress((p) => p && { ...p, trace: [], current: { messageId: e.message_id ?? "", text: r.text ?? "", userId: r.user_id ?? "", result: r } });
         if (replay) {
           const slot = Math.max(MIN_SLOT_MS, steps.length * STEP_MS);
           const gap = Math.min(STEP_MS * 2, slot / steps.length);

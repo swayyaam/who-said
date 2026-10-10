@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import type { MessageResult, ToolAttempt } from "../types";
 import { humanize, inr } from "../lib/format";
 import { ActionPill, DriverTag, Eyebrow, TrustBadge } from "./ui";
+import { ToolChip, finalStatus } from "./ToolChip";
 
 function Args({ title, note, data, tone }: { title: string; note: string; data: Record<string, unknown>; tone: string }) {
   const entries = Object.entries(data);
@@ -12,7 +13,7 @@ function Args({ title, note, data, tone }: { title: string; note: string; data: 
       {entries.length === 0 ? <div className="text-[13px]">none</div> : (
         <dl className="space-y-1">
           {entries.map(([k, v]) => (
-            <div key={k} className="grid grid-cols-[140px_1fr] gap-2 text-[13px]">
+            <div key={k} className="grid grid-cols-[minmax(110px,max-content)_1fr] gap-3 text-[13px]">
               <dt className="t-mono">{k}</dt>
               <dd className="t-mono break-all">{typeof v === "string" ? (v === "" ? "(empty)" : v) : JSON.stringify(v)}</dd>
             </div>
@@ -99,7 +100,12 @@ export function MessageDetail({ r, onClose }: { r: MessageResult; onClose: () =>
 
         <Block title={`Agent steps${r.agent.ran ? ` · ${r.agent.llm_calls} LLM call${r.agent.llm_calls === 1 ? "" : "s"}` : ""}`}>
           {!r.agent.ran ? <p className="text-[14px]">The agent did not run for this message (routed {r.routing.action}, nothing to act on).</p> : r.agent.attempts.length === 0 ? <p className="text-[14px]">The agent ran and chose no tool calls.</p> : (
-            <ol className="space-y-4">{r.agent.attempts.map((a, i) => <ToolCallCard key={i} a={a} index={i} />)}</ol>
+            <>
+              <div className="mb-4 flex flex-wrap gap-2" aria-label="Tool calls">
+                {r.agent.attempts.map((a, i) => <ToolChip key={i} attempt={a} status={finalStatus(a)} />)}
+              </div>
+              <ol className="space-y-4">{r.agent.attempts.map((a, i) => <ToolCallCard key={i} a={a} index={i} />)}</ol>
+            </>
           )}
           {r.agent.error && <p className="mt-3 rounded-md bg-pink p-3 text-[14px]">Agent error: {r.agent.error}</p>}
         </Block>

@@ -1,0 +1,82 @@
+.call-chip {
+  --cc-size: 34px;
+  --cc-font: 13px;
+  --cc-pad: 12px;
+  --cc-gap: 7px;
+  --cc-radius: 10px;
+  --cc-color: var(--color-ink);
+  --cc-surface: var(--color-soft);
+  --cc-progress: var(--color-ink);
+  --cc-progress-pct: 8%;
+  --cc-done: var(--color-success);
+  --cc-error: var(--color-magenta);
+  --cc-wash-pct: 14%;
+  --cc-expected: 2500ms;
+  --cc-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--cc-gap);
+  box-sizing: border-box;
+  height: var(--cc-size);
+  max-width: 100%;
+  padding: 0 var(--cc-pad);
+  border-radius: var(--cc-radius);
+  overflow: hidden;
+  background: var(--cc-surface);
+  color: var(--cc-color);
+  font-family: inherit;
+  font-size: var(--cc-font);
+  line-height: 1;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.call-chip__fill {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--cc-progress) var(--cc-progress-pct), transparent);
+  transform: scaleX(0);
+  transform-origin: left center;
+  clip-path: inset(0 0 0 0);
+  pointer-events: none;
+}
+.call-chip[data-status='running'] .call-chip__fill { transition: transform var(--cc-expected) linear; }
+.call-chip[data-status='done'] .call-chip__fill {
+  background: color-mix(in srgb, var(--cc-done) var(--cc-wash-pct), transparent);
+  clip-path: inset(100% 0 0 0);
+  transition: transform 200ms var(--cc-ease-out), background-color 120ms ease, clip-path 400ms var(--cc-ease-out) 200ms;
+}
+.call-chip[data-status='error'] .call-chip__fill {
+  background: color-mix(in srgb, var(--cc-error) var(--cc-wash-pct), transparent);
+  transition: background-color 200ms ease;
+}
+.call-chip:not([data-mounted]) .call-chip__fill,
+.call-chip:not([data-mounted]) .call-chip__glyph { transition: none !important; }
+
+.call-chip__slot { position: relative; flex: none; width: calc(var(--cc-font) + 2px); height: calc(var(--cc-font) + 2px); overflow: hidden; }
+.call-chip__glyph { position: absolute; inset: 0; display: grid; place-items: center; opacity: 0; transform: translateY(70%); filter: blur(3px); }
+.call-chip__glyph[data-state='in'] {
+  opacity: 1; transform: none; filter: blur(0);
+  transition: opacity 240ms var(--cc-ease-out), transform 240ms var(--cc-ease-out), filter 240ms var(--cc-ease-out);
+}
+.call-chip__glyph[data-state='out'] {
+  transform: translateY(-70%);
+  transition: opacity 160ms var(--cc-ease-out), transform 160ms var(--cc-ease-out), filter 160ms var(--cc-ease-out);
+}
+.call-chip[data-status='done'] .call-chip__glyph[data-state='in'] { color: var(--cc-done); }
+.call-chip[data-status='error'] .call-chip__glyph[data-state='in'] { color: var(--cc-error); }
+
+.call-chip__name, .call-chip__arg, .call-chip__timer { position: relative; }
+.call-chip__name { font-weight: 540; }
+.call-chip__arg { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-family: var(--font-mono); font-size: 0.92em; opacity: 0.72; }
+.call-chip__timer { min-width: 6ch; font-variant-numeric: tabular-nums; text-align: right; opacity: 0.5; }
+
+.call-chip__sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (prefers-reduced-motion: reduce) {
+  .call-chip[data-status='done'] .call-chip__fill { clip-path: inset(0 0 0 0); transition: background-color 120ms ease; }
+  .call-chip__glyph { transform: none !important; filter: none !important; }
+}
