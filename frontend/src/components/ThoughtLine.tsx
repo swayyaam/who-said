@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { animate, useReducedMotion } from "motion/react";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { ArrowDown01Icon, SparklesIcon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { ArrowDown01Icon, ShieldBanIcon, SparklesIcon, Tick02Icon } from "@hugeicons/core-free-icons";
 import type { TraceStep } from "../lib/trace";
 import "./ThoughtLine.css";
 
@@ -210,9 +210,11 @@ export default function ThoughtLine({
                 return (
                   <div key={`${i}-${s.text}`} className="thought-line__step" data-done={done ? "" : undefined} data-tone={s.tone}>
                     <span className="thought-line__mark" aria-hidden="true">
-                      {done ? <HugeiconsIcon icon={Tick02Icon} size="1em" strokeWidth={2.5} /> : <i className="thought-line__pulse" />}
+                      {s.tone === "bad" ? <HugeiconsIcon icon={ShieldBanIcon} size="1em" strokeWidth={2.2} />
+                        : done ? <HugeiconsIcon icon={Tick02Icon} size="1em" strokeWidth={2.5} /> : <i className="thought-line__pulse" />}
                     </span>
                     <span className="thought-line__step-text">{s.text}</span>
+                    {s.badge ? <span className="thought-line__badge">{s.badge}</span> : null}
                   </div>
                 );
               })}

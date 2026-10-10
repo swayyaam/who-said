@@ -50,7 +50,8 @@
   transition: transform 200ms var(--cc-ease-out), background-color 120ms ease, clip-path 400ms var(--cc-ease-out) 200ms;
 }
 .call-chip[data-status='error'] .call-chip__fill {
-  background: color-mix(in srgb, var(--cc-error) var(--cc-wash-pct), transparent);
+  /* denied: strong magenta fill; text stays black, the shield icon stays magenta */
+  background: color-mix(in srgb, var(--cc-error) 30%, transparent);
   transition: background-color 200ms ease;
 }
 .call-chip:not([data-mounted]) .call-chip__fill,

@@ -72,9 +72,7 @@ export default function CallChip({
     } else if (s === "done") {
       setFraction(1, !animate);
     } else if (s === "error") {
-      const fill = fillRef.current;
-      const live = fill ? new DOMMatrix(getComputedStyle(fill).transform).a : fraction.current;
-      setFraction(Math.min(1, Math.max(0, live)), true);
+      setFraction(1, true); // denied: the whole chip takes the magenta fill, running or static
       if (animate && shake > 0 && !reduceMotion() && rootRef.current) {
         shakeAnim.current = rootRef.current.animate(
           SHAKE.map((k) => ({ transform: `translateX(${k * shake}px)`, easing: "cubic-bezier(0.77, 0, 0.175, 1)" })),

@@ -97,11 +97,24 @@
 .thought-line__step-text { transition: opacity var(--tl-settle) ease; }
 .thought-line__step[data-done] .thought-line__step-text { opacity: 0.6; }
 
-/* AgntID verdicts: success / danger colors, always readable (never dimmed) */
+/* AgntID verdicts. Allowed: success green. Denied/harmful: black text (projector contrast),
+   with magenta only on the shield icon and a small white-on-magenta pill. */
 .thought-line__step[data-tone='ok'] { color: var(--tl-ok); }
-.thought-line__step[data-tone='bad'] { color: var(--tl-bad); font-weight: 540; }
+.thought-line__step[data-tone='bad'] { color: var(--color-ink); font-weight: 500; }
+.thought-line__step[data-tone='bad'] .thought-line__mark { color: var(--tl-bad); }
 .thought-line__step[data-tone] .thought-line__mark,
 .thought-line__step[data-tone][data-done] .thought-line__step-text { opacity: 1; }
+.thought-line__badge {
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--tl-bad);
+  color: var(--color-canvas);
+  font-family: var(--font-mono);
+  font-size: 0.7em;
+  font-weight: 400;
+  letter-spacing: 0.6px;
+  line-height: 1.2;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .thought-line__text { filter: none !important; transition: opacity var(--tl-settle) ease; }

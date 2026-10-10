@@ -2,7 +2,7 @@ import type { MessageResult, ToolCall } from "../types";
 import { DRIVER_LABEL, TRUST_LABEL, inr } from "./format";
 
 export type Tone = "ok" | "bad";
-export interface TraceStep { text: string; tone?: Tone }
+export interface TraceStep { text: string; tone?: Tone; /** small pill after a "bad" step */ badge?: string }
 
 const clip = (s: string, n = 44) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
@@ -28,9 +28,9 @@ export function buildSteps(r: MessageResult): TraceStep[] {
   for (const a of r.agent.attempts) {
     const arg = keyArg(a.call);
     steps.push({ text: `Agent proposed ${a.call.tool}${arg ? ` ${arg}` : ""}` });
-    if (!a.decision.enforced) steps.push({ text: a.harmful ? "AgntID off: ran unchecked, harmful" : "AgntID off: ran unchecked", tone: a.harmful ? "bad" : "ok" });
+    if (!a.decision.enforced) steps.push({ text: a.harmful ? "AgntID off: ran unchecked, harmful" : "AgntID off: ran unchecked", tone: a.harmful ? "bad" : "ok", badge: a.harmful ? "HARMFUL" : undefined });
     else if (a.decision.allowed) steps.push({ text: "AgntID: allowed", tone: "ok" });
-    else steps.push({ text: `AgntID: denied (${a.decision.layer})`, tone: "bad" });
+    else steps.push({ text: `AgntID: denied (${a.decision.layer})`, tone: "bad", badge: "DENIED" });
   }
   return steps;
 }
