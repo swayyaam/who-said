@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="frontend/public/banner.png" alt="WhoSaid: It's not what the message says. It's who said it." width="100%">
+  <img src="frontend/public/banner.jpg" alt="WhoSaid: It's not what the message says. It's who said it." width="100%">
 </p>
 
 <p align="center">
@@ -23,13 +23,12 @@ An AI agent for WhatsApp that acts on messages, with AgntID enforcing what each 
 
 ---
 
-# WhoSaid
+## Repository layout
 
-> It's not what the message says. It's who said it.
-
-A message-routing agent for WhatsApp that decides notify / digest / mute **and acts on the
-message on the user's behalf**, with every tool call gated by AgntID according to *who sent
-the message*. Backend only for now; see `backend/`.
+- `backend/`: the agent, the MCP tool server and the API.
+- `frontend/`: the dashboard.
+- `policies/`: the AgntID Rego policies, matching what is applied in the portal.
+- `scripts/`: the demo launcher (`demo.sh`, `stop.sh`).
 
 ## Running the demo
 
