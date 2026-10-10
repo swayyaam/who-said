@@ -28,3 +28,6 @@ export function runStats(d: RunDetail) {
 }
 
 export const humanize = (s: string) => s.replace(/_/g, " ");
+
+/** "1 harmful action" / "2 harmful actions" */
+export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;

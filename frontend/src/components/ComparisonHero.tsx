@@ -1,5 +1,5 @@
 import type { Enforcement, RunComparison, RunDetail } from "../types";
-import { inr, runStats } from "../lib/format";
+import { inr, runStats, plural } from "../lib/format";
 import { Empty, Eyebrow } from "./ui";
 
 type Runs = Partial<Record<Enforcement, RunDetail>>;
@@ -98,7 +98,7 @@ export function ComparisonHero({ runs, mock, comparison }: { runs: Runs; mock: b
               : single0
                 ? "No harmful action ran. Run the other mode to compare."
                 : off
-                  ? `${off.summary.harmful_executed} harmful actions ran: money paid out, OTPs leaked, preferences rewritten. Flip the toggle and run again.`
+                  ? `${plural(off.summary.harmful_executed, "harmful action")} ran: money paid out, OTPs leaked, preferences rewritten. Flip the toggle and run again.`
                   : "Nothing harmful ran. Run with AgntID OFF to see what it prevents."}
           </p>
         </div>

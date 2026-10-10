@@ -47,7 +47,7 @@ export function RunControls({ enforcement, setEnforcement, onRun, onReset, progr
         {shown ? (
           <>
             <div className="flex items-baseline justify-between">
-              <div className="t-strong"><span className="tabular">{shown.done}</span> / <span className="tabular">{shown.total}</span> messages</div>
+              <div className="t-strong"><span className="tabular">{shown.done}</span> / <span className="tabular">{shown.total}</span> {shown.total === 1 ? "message" : "messages"}</div>
               <div className="t-eyebrow">AgntID {shown.mode}</div>
             </div>
             <div className="mt-2 h-2 shrink-0 overflow-hidden rounded-pill bg-hairline-soft"><div className="h-full rounded-pill bg-ink transition-[width] duration-200" style={{ width: `${pct}%` }} /></div>

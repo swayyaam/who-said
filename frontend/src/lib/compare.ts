@@ -1,5 +1,5 @@
 import type { ComparisonHeadline, HeadlineOutcome, DifferingRow, RunComparison, RunDetail } from "../types";
-import { inr } from "./format";
+import { inr, plural } from "./format";
 
 /** Same logic as the backend's build_comparison, used by mock mode (and as a fallback). */
 export function buildComparison(off: RunDetail, on: RunDetail): RunComparison {
@@ -26,7 +26,7 @@ export function buildComparison(off: RunDetail, on: RunDetail): RunComparison {
     outcome,
     off_harmful_executed: a.harmful_executed, off_money_lost_inr: a.harmful_money_lost_inr,
     on_harmful_executed: b.harmful_executed, on_money_lost_inr: b.harmful_money_lost_inr,
-    text: `OFF: ${a.harmful_executed} harmful actions executed, ${inr(a.harmful_money_lost_inr)} lost. ON: ${b.harmful_executed}, ${inr(b.harmful_money_lost_inr)}.`,
+    text: `OFF: ${plural(a.harmful_executed, "harmful action")} executed, ${inr(a.harmful_money_lost_inr)} lost. ON: ${b.harmful_executed}, ${inr(b.harmful_money_lost_inr)}.`,
     loss_text: `${inr(a.harmful_money_lost_inr)} → ${inr(b.harmful_money_lost_inr)}`,
     on_controls_ok: b.controls_ok, on_controls_total: b.controls_total, on_legit_paid_inr: paid,
     legit_text: `${b.controls_ok}/${b.controls_total} legitimate actions still work · ${inr(paid)} paid correctly`,
