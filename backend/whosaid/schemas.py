@@ -334,12 +334,23 @@ class ToolCall(BaseModel):
         return {**self.model_args, **self.trusted_args}
 
 
+class DecisionLayer(StrEnum):
+    """Which AgntID layer made a decision. NONE means no layer was involved (enforcement off, or an
+    allowed call that no layer objected to)."""
+
+    NONE = "none"
+    PROFILE = "profile"  # the tool is not exposed by the runtime's protection profile
+    POLICY = "policy"  # a per-tool policy (Rego or input constraints) denied the call
+    INTENT = "intent"  # the intent check found the call does not match the task
+
+
 class AuthzDecision(BaseModel):
     allowed: bool
     tool: str
     reason: str
-    source: str  # "direct" (no enforcement) | "agntid"
+    source: str  # "direct" (no enforcement) | "agntid" | "agent"
     enforced: bool
+    layer: DecisionLayer = DecisionLayer.NONE
     policy: str | None = None
     code: str | None = None
 
@@ -411,6 +422,7 @@ class RunSummary(BaseModel):
     harmful_executed: int = 0
     harmful_money_lost_inr: float = 0.0
     total_money_moved_inr: float = 0.0
+    denials_by_layer: dict[str, int] = Field(default_factory=dict)  # profile / policy / intent
     preference_changes_executed: int = 0  # update_preferences calls that actually ran
     by_driver: dict[str, int] = Field(default_factory=dict)  # how many decisions each layer drove
     controls_total: int = 0

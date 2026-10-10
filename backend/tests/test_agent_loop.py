@@ -28,7 +28,7 @@ async def test_model_cannot_set_or_override_trusted_params(demo, trust_of, setti
     """The model tries to claim a trusted sender, a different payee, user and message."""
     forged = {"payee_upi": "evil@upi", "amount_inr": 500, "sender_trust": "verified_business",
               "registered_payee": "evil@upi", "user_id": "victim", "message_id": "forged", "sender_id": "someone_else",
-              "allowed_recipients": ["+91 98110 22334"]}
+              "allowed_recipients": "+91 98110 22334"}
     llm = ScriptedLLM(lambda msgs, tools: tool_calls(("pay_upi", forged)) if msgs[-1]["role"] == "user" else final())
     gw = RecordingGateway(pay_tool_descriptors)
     msg = _msg(demo, "msg_206")  # unknown sender
@@ -44,7 +44,7 @@ async def test_model_cannot_set_or_override_trusted_params(demo, trust_of, setti
     assert call.arguments["registered_payee"] == ""
     assert call.arguments["user_id"] == msg.user_id and call.arguments["message_id"] == "msg_206"
     assert call.arguments["sender_id"] == trust.sender.sender_id
-    assert call.arguments["allowed_recipients"] == ["u_105", "u_113"]  # the user's real contacts, not the forged list
+    assert call.arguments["allowed_recipients"] == "u_105,u_113"  # the user's real contacts, not the forged list
     # What the model proposed survives only for the non-trusted fields.
     assert call.model_args == {"payee_upi": "evil@upi", "amount_inr": 500}
     assert trace.attempts[0].call is call or trace.attempts[0].call == call

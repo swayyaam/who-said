@@ -10,7 +10,12 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
+from typing import TYPE_CHECKING
+
 from pydantic import BaseModel, ConfigDict, Field
+
+if TYPE_CHECKING:
+    from whosaid.schemas import Enforcement
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 DEMO_DATA_DIR = Path(__file__).resolve().parent / "data" / "demo"
@@ -33,6 +38,13 @@ class Settings(BaseModel):
     mcp_server_host: str = "127.0.0.1"
     mcp_server_port: int = 8765
     mcp_server_url: str = "http://127.0.0.1:8765/mcp"
+    # Shared secret for the tool server's /mcp endpoint: the AgntID runtime's bearer credential.
+    # Empty means "no check" (tests, quick local use). The separate secret for the AgntID-OFF demo
+    # path is deliberately NOT here: see direct_access_secret().
+    tool_server_secret: str = Field(default="", repr=False)
+    # The tool server only honours the OFF-mode (direct) secret when this is true. A production
+    # deployment leaves it false, which removes the bypass entirely.
+    demo_allow_direct: bool = False
 
     # AgntID runtime (phase c)
     agntid_mcp_url: str = "http://localhost:8082/mcp"
@@ -52,6 +64,19 @@ class Settings(BaseModel):
     cache_dir: Path = Path(".cache")
     nonce_secret: str = Field(default="whosaid-demo-nonce-secret", repr=False)
     log_level: str = "INFO"
+
+
+def direct_access_secret(enforcement: "Enforcement") -> str:
+    """The credential for the direct (AgntID OFF) path to the tool server.
+
+    Read from the environment ONLY when enforcement is OFF. With enforcement ON this returns ""
+    without touching the environment, so the ON path can never hold the bypass credential.
+    """
+    from whosaid.schemas import Enforcement
+
+    if enforcement is not Enforcement.OFF:
+        return ""
+    return os.environ.get("DIRECT_ACCESS_SECRET", "").strip()
 
 
 def profile_params(settings: "Settings"):
@@ -84,6 +109,8 @@ def load_settings(env_file: Path | None = None) -> Settings:
         mcp_server_host=_env("MCP_SERVER_HOST", d.mcp_server_host),
         mcp_server_port=int(_env("MCP_SERVER_PORT", str(d.mcp_server_port))),
         mcp_server_url=_env("MCP_SERVER_URL", d.mcp_server_url),
+        tool_server_secret=_env("TOOL_SERVER_SECRET", ""),
+        demo_allow_direct=_env("DEMO_ALLOW_DIRECT", "false").lower() in {"1", "true", "yes"},
         agntid_mcp_url=_env("AGNTID_MCP_URL", d.agntid_mcp_url),
         agntid_access_token=_env("AGNTID_ACCESS_TOKEN", ""),
         profile_min_alpha=float(_env("PROFILE_MIN_ALPHA", str(d.profile_min_alpha))),

@@ -24,7 +24,7 @@ from whosaid.logging_setup import setup_logging
 from whosaid.mcp_server.admin import ServerPreferenceReader, ToolServerAdmin, ensure_tool_server
 from whosaid.profile import Preferences, PreferenceError, apply_update, seed_book
 from whosaid.pipeline import run_dataset
-from whosaid.report import render_result, render_summary
+from whosaid.report import render_comparison, render_result, render_summary
 from whosaid.schemas import Enforcement
 from whosaid.summary import summarize
 
@@ -34,7 +34,8 @@ def _resolve_dataset(arg: str):
     return load_dataset_dir(path, name="demo" if arg == "demo" else None)
 
 
-async def _run(args: argparse.Namespace, settings: Settings, console: Console) -> int:
+async def _run(args: argparse.Namespace, settings: Settings, console: Console, *, quiet: bool = False):
+    """Run the dataset once. Returns (results, summary)."""
     dataset = _resolve_dataset(args.dataset)
     enforcement = Enforcement(args.enforcement)
     use_fixture = args.dataset == "demo" and not args.no_fixture
@@ -46,17 +47,30 @@ async def _run(args: argparse.Namespace, settings: Settings, console: Console) -
             results = await run_dataset(
                 dataset, llm=llm, gateway_factory=gateway_factory(settings, enforcement), settings=settings,
                 preferences=ServerPreferenceReader(admin), profile_params=profile_params(settings),
-                on_result=lambda r: render_result(console, r), only=set(args.only) if args.only else None,
+                on_result=None if quiet else (lambda r: render_result(console, r)), only=set(args.only) if args.only else None,
                 limit=args.limit, concurrency=args.concurrency,
             )
             state = admin.state()
     finally:
         await llm.aclose()
-    console.print()
-    render_summary(console, summarize(results, enforcement=enforcement, model=llm.model, dataset_id=dataset.dataset_id))
-    _print_preference_changes(console, dataset.preferences, state.preferences)
-    spent = sum(e.amount_inr for e in state.ledger if e.tool == "pay_upi" and e.status == "ok")
-    console.print(f"[dim]tool-server ledger: ₹{spent:,.0f} actually paid out · {len(state.ledger)} effect(s) recorded[/]")
+    summary = summarize(results, enforcement=enforcement, model=llm.model, dataset_id=dataset.dataset_id)
+    if not quiet:
+        console.print()
+        render_summary(console, summary)
+        _print_preference_changes(console, dataset.preferences, state.preferences)
+        spent = sum(e.amount_inr for e in state.ledger if e.tool == "pay_upi" and e.status == "ok")
+        console.print(f"[dim]tool-server ledger: ₹{spent:,.0f} actually paid out · {len(state.ledger)} effect(s) recorded[/]")
+    return results, summary
+
+
+async def _compare(args: argparse.Namespace, settings: Settings, console: Console) -> int:
+    """Run the dataset with AgntID OFF, then ON, and print them side by side."""
+    runs = {}
+    for mode in ("off", "on"):
+        run_args = argparse.Namespace(**{**vars(args), "enforcement": mode})
+        console.print(f"[bold]running with AgntID {mode.upper()}...[/]")
+        runs[mode] = await _run(run_args, settings, console, quiet=True)
+    render_comparison(console, runs["off"][1], runs["on"][1], runs["off"][0], runs["on"][0])
     return 0
 
 
@@ -121,7 +135,7 @@ async def _refresh_fixture(args: argparse.Namespace, settings: Settings, console
         for mode in modes:
             run_args = argparse.Namespace(dataset="demo", enforcement=mode, only=None, limit=None, concurrency=1,
                                           no_spawn=args.no_spawn, no_fixture=True)
-            await _run(run_args, scratch, console)
+            await _run(run_args, scratch, console, quiet=True)
         target = DEMO_FIXTURE_DIR / "llm"
         if target.exists() and not args.merge:
             shutil.rmtree(target)
@@ -161,6 +175,14 @@ def main(argv: list[str] | None = None) -> int:
     pr = sub.add_parser("profile", help="print a user's learned profile (seeded from the dataset)")
     pr.add_argument("user")
     pr.add_argument("--dataset", default="demo")
+    cmp_ = sub.add_parser("compare", help="run the dataset with AgntID OFF then ON and print them side by side")
+    cmp_.add_argument("--dataset", default="demo")
+    cmp_.add_argument("--only", nargs="*")
+    cmp_.add_argument("--limit", type=int)
+    cmp_.add_argument("--concurrency", type=int)
+    cmp_.add_argument("--model")
+    cmp_.add_argument("--no-spawn", action="store_true")
+    cmp_.add_argument("--no-fixture", action="store_true")
     sub.add_parser("serve-mcp", help="run the MCP tool server")
     args = p.parse_args(argv)
 
@@ -180,13 +202,16 @@ def main(argv: list[str] | None = None) -> int:
         setup_logging(settings.log_level, stream=open(settings.cache_dir / "whosaid.log", "a", encoding="utf-8"))
     console = Console()
     try:
+        if args.command == "compare":
+            return asyncio.run(_compare(args, settings, console))
         if args.command == "prefs":
             return _cmd_prefs(args, settings, console)
         if args.command == "profile":
             return _cmd_profile(args, console)
         if args.command == "refresh-fixture":
             return asyncio.run(_refresh_fixture(args, settings, console))
-        return asyncio.run(_run(args, settings, console))
+        asyncio.run(_run(args, settings, console))
+        return 0
     except WhoSaidError as exc:
         console.print(f"[bold red]error:[/] {exc}")
         for problem in getattr(exc, "problems", [])[1:]:

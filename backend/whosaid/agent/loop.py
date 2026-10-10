@@ -12,13 +12,14 @@ import json
 import time
 from typing import Any
 
+from whosaid.agent.intent import build_task_intent
 from whosaid.agent.prompts import SYSTEM_PROMPT, build_user_prompt, derive_nonce
 from whosaid.agent.tool_gateway import GatewayResult, TaskInfo, ToolDescriptor, ToolGateway
 from whosaid.errors import GatewayError, LLMError
 from whosaid.events import Emitter, noop_emit
 from whosaid.llm.base import LLMClient, ProposedToolCall
 from whosaid.logging_setup import log_event
-from whosaid.schemas import AgentTrace, AuthzDecision, EventType, Message, SenderTrust, ToolAttempt, ToolCall
+from whosaid.schemas import AgentTrace, AuthzDecision, EventType, Message, RoutingDecision, SenderTrust, ToolAttempt, ToolCall
 from whosaid.tool_contract import model_visible_input_schema, strip_trusted
 
 
@@ -30,7 +31,7 @@ def to_openai_tools(tools: list[ToolDescriptor]) -> list[dict[str, Any]]:
             "description": t.description,
             "parameters": model_visible_input_schema(t.input_schema),
         }}
-        for t in tools
+        for t in sorted(tools, key=lambda t: t.name)  # a stable order: the same prompt (and cache key) in every mode
     ]
 
 
@@ -42,13 +43,13 @@ def build_trusted_args(message: Message, trust: SenderTrust) -> dict[str, Any]:
         "sender_id": trust.sender.sender_id,
         "sender_trust": trust.level.value,
         "registered_payee": trust.registered_payee or "",
-        "allowed_recipients": list(trust.allowed_recipients),
+        "allowed_recipients": ",".join(trust.allowed_recipients),  # comma-separated: AgntID types it as a string
     }
 
 
-def task_intent() -> str:
-    """What the user asked of the agent. Deliberately free of message content."""
-    return "Handle the user's new incoming message and take any actions it calls for."
+def task_intent(trust: SenderTrust, routing: RoutingDecision | None = None) -> str:
+    """What the user asked of the agent, from trusted data only. Never contains message content."""
+    return build_task_intent(trust, routing)
 
 
 def _tool_message_for_model(call_id: str, attempt: ToolAttempt, gw: GatewayResult) -> dict[str, Any]:
@@ -106,11 +107,12 @@ async def run_agent(
     media_description: str | None = None,
     max_turns: int = 4,
     emit: Emitter = noop_emit,
+    routing: RoutingDecision | None = None,
 ) -> AgentTrace:
     """Run the agent on one message. Never raises for LLM or gateway failure: the error is recorded."""
     started = time.perf_counter()
     trace = AgentTrace(ran=True)
-    task = TaskInfo(message_id=message.message_id, user_id=message.user_id, intent=task_intent())
+    task = TaskInfo(message_id=message.message_id, user_id=message.user_id, intent=task_intent(trust, routing))
     try:
         tools = await gateway.list_tools()
         known = {t.name for t in tools}

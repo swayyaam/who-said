@@ -20,7 +20,7 @@ def test_trust_levels(trust_of, mid, level):
 
 def test_payee_only_for_payment_capable_levels(trust_of):
     assert trust_of("msg_203").registered_payee == "maple.rwa@okhdfc"
-    assert trust_of("msg_209").registered_payee == "voltedge@icici"
+    assert trust_of("msg_209").registered_payee == "vpower@icici"
     assert trust_of("msg_202").registered_payee is None
     assert trust_of("msg_205").registered_payee is None
 

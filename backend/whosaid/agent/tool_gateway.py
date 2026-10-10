@@ -23,6 +23,9 @@ class ToolDescriptor(BaseModel):
     name: str
     description: str = ""
     input_schema: dict[str, Any] = Field(default_factory=dict)
+    # False when the enforcement point hides the tool (e.g. AgntID's protection profile excludes it).
+    exposed: bool = True
+    excluded_reason: str = ""
 
 
 class TaskInfo(BaseModel):
@@ -75,10 +78,10 @@ class DirectGateway:
 
     enforced = False
 
-    def __init__(self, target: Any) -> None:
+    def __init__(self, target: Any, secret: str = "") -> None:
         """``target`` is the tool server's MCP URL, or an in-process FastMCP server (tests)."""
         self._url = target if isinstance(target, str) else "<in-process server>"
-        self._client = Client(target)
+        self._client = Client(target, auth=secret or None)
 
     async def __aenter__(self) -> "DirectGateway":
         try:

@@ -112,3 +112,52 @@ def pay_tool_descriptors() -> list[ToolDescriptor]:
     }
     return [ToolDescriptor(name="pay_upi", description="pay", input_schema=full),
             ToolDescriptor(name="reply", description="reply", input_schema={"type": "object", "properties": {"text": {"type": "string"}, "user_id": {"type": "string"}}, "required": ["text"]})]
+
+
+class OracleGateway:
+    """A test double for AgntIDGateway: the oracle decides, the in-process tool server executes.
+
+    Reasons are produced exactly as AgntIDGateway produces them (profile reason / explain_denial), so the model
+    sees the same text and the recorded LLM fixture replays. Tests only: AgntID decides in production.
+    """
+
+    enforced = True
+
+    def __init__(self, server) -> None:
+        self._direct = DirectGateway(server)
+
+    async def __aenter__(self):
+        await self._direct.__aenter__()
+        return self
+
+    async def __aexit__(self, *exc):
+        await self._direct.__aexit__(*exc)
+
+    async def list_tools(self):
+        from policy_oracle import HIDDEN_BY_PROFILE
+        from whosaid.authz.explain import profile_exclusion_reason
+
+        return [t.model_copy(update={"exposed": t.name not in HIDDEN_BY_PROFILE,
+                                     "excluded_reason": profile_exclusion_reason(t.name) if t.name in HIDDEN_BY_PROFILE else ""})
+                for t in await self._direct.list_tools()]
+
+    async def open_task(self, task):
+        return None
+
+    async def close_task(self, task):
+        return None
+
+    async def call_tool(self, call):
+        from policy_oracle import decide_layered
+        from whosaid.authz.explain import explain_denial, profile_exclusion_reason
+        from whosaid.schemas import DecisionLayer
+
+        allowed, _, layer = decide_layered(call.tool, call.arguments)
+        if not allowed:
+            reason = f"DENIED {profile_exclusion_reason(call.tool)}" if layer == "profile" else (
+                explain_denial(call.tool, call.arguments) or f"DENIED {call.tool}")
+            return GatewayResult(decision=AuthzDecision(allowed=False, tool=call.tool, reason=reason, source="agntid", enforced=True,
+                                                        layer=DecisionLayer(layer)))
+        out = await self._direct.call_tool(call)
+        out.decision = AuthzDecision(allowed=True, tool=call.tool, reason=f"ALLOWED {call.tool}: AgntID checks passed", source="agntid", enforced=True)
+        return out

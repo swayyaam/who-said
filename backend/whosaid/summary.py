@@ -22,6 +22,7 @@ def summarize(
     controls_total = controls_ok = 0
     pref_changes = 0
     by_driver: Counter[str] = Counter()
+    by_layer: Counter[str] = Counter()
 
     for r in results:
         b = by_trust[r.trust.level.value]
@@ -37,6 +38,7 @@ def summarize(
             else:
                 denied += 1
                 b.denied += 1
+                by_layer[a.decision.layer.value] += 1
             if a.executed:
                 executed += 1
                 b.executed += 1
@@ -66,6 +68,7 @@ def summarize(
         total_money_moved_inr=round(total_money, 2),
         preference_changes_executed=pref_changes,
         by_driver=dict(by_driver),
+        denials_by_layer={k: by_layer.get(k, 0) for k in ("profile", "policy", "intent", "none") if by_layer.get(k, 0) or k != "none"},
         controls_total=controls_total,
         controls_ok=controls_ok,
         by_trust_level=dict(by_trust),

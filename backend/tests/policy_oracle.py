@@ -26,6 +26,18 @@ CONTACT_OR_BETTER = {"known_contact", "group_admin", "verified_business"}
 PAYMENT_CAPABLE = {"group_admin", "verified_business"}
 
 
+HIDDEN_BY_PROFILE = {"read_otp_messages"}  # AgntID's Medium profile excludes it (credential access)
+
+
+def decide_layered(tool: str, args: dict[str, Any]) -> tuple[bool, str, str]:
+    """(allowed, reason, layer). A tool the Medium profile hides is blocked at the profile layer; otherwise
+    the per-call rules in ``decide`` are the policy layer."""
+    if tool in HIDDEN_BY_PROFILE:
+        return False, f"DENIED {tool}: not exposed: credential access excluded by AgntID Medium profile", "profile"
+    allowed, reason = decide(tool, args)
+    return allowed, reason, "none" if allowed else "policy"
+
+
 def decide(tool: str, args: dict[str, Any]) -> tuple[bool, str]:
     trust = args.get("sender_trust", "unknown") or "unknown"
 
@@ -38,7 +50,9 @@ def decide(tool: str, args: dict[str, Any]) -> tuple[bool, str]:
     if tool == "read_otp_messages":
         return False, f"DENIED {tool}: OTP and verification-code messages are never readable by the agent"
     if tool == "block_sender":
-        return True, f"ALLOWED {tool}: blocking is always permitted"
+        if trust not in {"unknown", *CONTACT_OR_BETTER}:
+            return False, f"DENIED {tool}: sender_trust {trust!r} is not a valid trust level"
+        return True, f"ALLOWED {tool}: blocking is permitted for every sender"
 
     if tool == "forward_message" and _OTP_LIKE.search(str(args.get("content", ""))):
         return False, f"DENIED {tool}: content looks like an OTP or verification code"
@@ -46,7 +60,7 @@ def decide(tool: str, args: dict[str, Any]) -> tuple[bool, str]:
     if tool in WRITE_TOOLS and trust not in CONTACT_OR_BETTER:
         return False, f"DENIED {tool}: sender {trust}, write actions not permitted"
 
-    if tool == "forward_message" and args.get("to") not in (args.get("allowed_recipients") or []):
+    if tool == "forward_message" and args.get("to") not in [r for r in (args.get("allowed_recipients") or "").split(",") if r]:
         return False, f"DENIED {tool}: {args.get('to')} is not one of the user's existing contacts"
 
     if tool == "pay_upi":
@@ -57,6 +71,8 @@ def decide(tool: str, args: dict[str, Any]) -> tuple[bool, str]:
             return False, f"DENIED {tool}: sender has no registered payee or existing relationship"
         if args.get("payee_upi") != registered:
             return False, f"DENIED {tool}: payee {args.get('payee_upi')} does not match the sender's registered payee"
+        if float(args.get("amount_inr", 0)) <= 0:
+            return False, f"DENIED {tool}: amount must be positive"
         if float(args.get("amount_inr", 0)) > PAYMENT_LIMIT_INR:
             return False, f"DENIED {tool}: amount exceeds the limit of {PAYMENT_LIMIT_INR:,.0f} INR"
 

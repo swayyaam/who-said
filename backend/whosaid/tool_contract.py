@@ -17,8 +17,17 @@ TRUSTED_PARAMS: tuple[str, ...] = (
     "sender_id",  # who sent it
     "sender_trust",  # TrustLevel value, computed in code
     "registered_payee",  # the sender's registered UPI ID, if any ("" when none)
-    "allowed_recipients",  # the receiving user's existing contacts (the only valid forward targets)
+    "allowed_recipients",  # comma-separated ids of the receiving user's existing contacts (the only valid forward targets)
 )
+
+# Parameters the AgntID runtime adds to every tool schema for its own bookkeeping (task id, approval, delegation).
+# The model never sees or sets them; the SDK/gateway handles them.
+PLATFORM_PREFIXES: tuple[str, ...] = ("agntid_", "_")
+
+
+def is_platform_param(name: str) -> bool:
+    return name.startswith(PLATFORM_PREFIXES)
+
 
 TOOL_NAMES: tuple[str, ...] = (
     "reply",
@@ -31,17 +40,32 @@ TOOL_NAMES: tuple[str, ...] = (
 )
 
 
+def _clean_property(name: str, prop: dict[str, Any]) -> dict[str, Any]:
+    """Make a property schema the same whether it came from our server or the AgntID runtime."""
+    prop = dict(prop)
+    if "anyOf" in prop:  # Optional[X] -> X
+        non_null = [p for p in prop.pop("anyOf") if p.get("type") != "null"]
+        if len(non_null) == 1:
+            prop = {**non_null[0], **prop}
+    prop.pop("title", None)
+    if prop.get("default") is None:
+        prop.pop("default", None)
+    if prop.get("description") == name:
+        prop.pop("description", None)
+    return prop
+
+
 def model_visible_input_schema(input_schema: dict[str, Any]) -> dict[str, Any]:
-    """A tool's JSON schema with every trusted parameter removed."""
+    """A tool's JSON schema with every trusted parameter removed, normalised for the model."""
     schema = copy.deepcopy(input_schema)
-    props = schema.get("properties", {})
-    for name in TRUSTED_PARAMS:
-        props.pop(name, None)
-    schema["required"] = [r for r in schema.get("required", []) if r not in TRUSTED_PARAMS]
+    props = {k: _clean_property(k, v) for k, v in schema.get("properties", {}).items() if k not in TRUSTED_PARAMS and not is_platform_param(k)}
+    schema["properties"] = props
+    schema.pop("title", None)
+    schema["required"] = [r for r in schema.get("required", []) if r not in TRUSTED_PARAMS and not is_platform_param(r)]
     return schema
 
 
 def strip_trusted(arguments: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
     """Drop any trusted parameter the model tried to supply. Returns (clean, dropped names)."""
-    dropped = [k for k in arguments if k in TRUSTED_PARAMS]
-    return {k: v for k, v in arguments.items() if k not in TRUSTED_PARAMS}, dropped
+    dropped = [k for k in arguments if k in TRUSTED_PARAMS or is_platform_param(k)]
+    return {k: v for k, v in arguments.items() if k not in dropped}, dropped

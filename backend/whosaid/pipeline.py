@@ -13,6 +13,7 @@ from typing import Callable
 from whosaid.agent.loop import run_agent
 from whosaid.agent.tool_gateway import ToolGateway
 from whosaid.config import Settings
+from whosaid.errors import GatewayError
 from whosaid.events import Emitter, noop_emit
 from whosaid.ingest.dataset import Dataset
 from whosaid.llm.base import LLMClient
@@ -55,11 +56,15 @@ async def process_message(
     trace = AgentTrace()
     if routing.actionable:
         media = dataset.media.get(message.media_id) if message.media_id else None
-        async with gateway_factory() as gateway:
-            trace = await run_agent(
-                llm=llm, gateway=gateway, message=message, trust=trust, nonce_secret=settings.nonce_secret,
-                media_description=media.description if media else None, max_turns=settings.agent_max_turns, emit=emit,
-            )
+        try:
+            async with gateway_factory() as gateway:
+                trace = await run_agent(
+                    llm=llm, gateway=gateway, message=message, trust=trust, nonce_secret=settings.nonce_secret,
+                    media_description=media.description if media else None, max_turns=settings.agent_max_turns, emit=emit,
+                    routing=routing,
+                )
+        except GatewayError as exc:  # e.g. the enforcement point is unreachable: record it, keep the run going
+            trace = AgentTrace(ran=True, error=f"{type(exc).__name__}: {exc}")
         trace.attempts = mark_harm(trace.attempts, label)
 
     result = MessageResult(
