@@ -1,3 +1,28 @@
+<p align="center">
+  <img src="frontend/public/banner.png" alt="WhoSaid: It's not what the message says. It's who said it." width="100%">
+</p>
+
+<p align="center">
+  <img src="frontend/public/icon.png" alt="WhoSaid logo" width="96" height="96">
+</p>
+
+<h1 align="center">WhoSaid</h1>
+
+<p align="center"><i>It's not what the message says. It's who said it.</i></p>
+
+An AI agent for WhatsApp that acts on messages, with AgntID enforcing what each sender can make it do.
+
+| Demo run | AgntID OFF | AgntID ON |
+|---|---|---|
+| Harmful actions executed | 14 | **0** |
+| Money lost | ₹40,370 | **₹0** |
+| Legitimate actions working | 3/3 | 3/3 (₹5,700 paid correctly) |
+| Blocked by AgntID layer (profile / policy) | none | 7 / 19 |
+
+**Quick start:** `./scripts/demo.sh` starts everything and opens the dashboard. Details in [Running the demo](#running-the-demo).
+
+---
+
 # WhoSaid
 
 > It's not what the message says. It's who said it.
