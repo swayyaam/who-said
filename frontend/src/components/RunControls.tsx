@@ -1,6 +1,7 @@
 import type { Enforcement } from "../types";
-import type { Progress } from "../hooks/useDashboard";
+import type { Finished, Progress } from "../hooks/useDashboard";
 import { Button, Eyebrow } from "./ui";
+import ThoughtLine from "./ThoughtLine";
 
 function Toggle({ value, onChange, disabled }: { value: Enforcement; onChange: (v: Enforcement) => void; disabled: boolean }) {
   const seg = (v: Enforcement, label: string) => (
@@ -16,12 +17,13 @@ function Toggle({ value, onChange, disabled }: { value: Enforcement; onChange: (
   );
 }
 
-export function RunControls({ enforcement, setEnforcement, onRun, onReset, progress, hasDataset, hasRuns }: {
+export function RunControls({ enforcement, setEnforcement, onRun, onReset, progress, finished, hasDataset, hasRuns }: {
   enforcement: Enforcement; setEnforcement: (v: Enforcement) => void; onRun: () => void; onReset: () => void;
-  progress: Progress | null; hasDataset: boolean; hasRuns: boolean;
+  progress: Progress | null; finished: Finished | null; hasDataset: boolean; hasRuns: boolean;
 }) {
   const running = !!progress;
-  const pct = progress && progress.total ? Math.min(100, (progress.done / progress.total) * 100) : 0;
+  const shown = progress ?? finished;
+  const pct = shown && shown.total ? Math.min(100, (shown.done / shown.total) * 100) : 0;
   return (
     <div className="flex h-full min-h-[300px] flex-col rounded-lg border border-hairline p-6">
       <Eyebrow>2 · Run</Eyebrow>
@@ -33,23 +35,32 @@ export function RunControls({ enforcement, setEnforcement, onRun, onReset, progr
         <Button variant="secondary" onClick={onReset} disabled={running || (!hasRuns && !hasDataset)}>Reset</Button>
       </div>
 
-      {/* fixed-height progress area so nothing jumps */}
-      <div className="mt-5 min-h-[88px]" aria-live="polite">
-        {running ? (
-          <div className="fade-in">
+      {/* fixed-height progress area so nothing jumps; the trace scrolls inside it */}
+      <div className="mt-5 flex h-[236px] flex-col" aria-live="polite">
+        {shown ? (
+          <>
             <div className="flex items-baseline justify-between">
-              <div className="t-strong"><span className="tabular">{progress.done}</span> / <span className="tabular">{progress.total}</span> messages</div>
-              <div className="t-eyebrow">AgntID {progress.mode}</div>
+              <div className="t-strong"><span className="tabular">{shown.done}</span> / <span className="tabular">{shown.total}</span> messages</div>
+              <div className="t-eyebrow">AgntID {shown.mode}</div>
             </div>
-            <div className="mt-2 h-2 overflow-hidden rounded-pill bg-hairline-soft"><div className="h-full rounded-pill bg-ink transition-[width] duration-200" style={{ width: `${pct}%` }} /></div>
-            <div className="mt-2 flex items-center gap-2 text-[14px]">
-              <span className="pulse inline-block h-2 w-2 shrink-0 rounded-full bg-ink" />
-              <span className="truncate">{progress.current ? `${progress.current.messageId} · ${progress.current.text}` : "Starting…"}</span>
+            <div className="mt-2 h-2 shrink-0 overflow-hidden rounded-pill bg-hairline-soft"><div className="h-full rounded-pill bg-ink transition-[width] duration-200" style={{ width: `${pct}%` }} /></div>
+            <div className="mt-3 min-h-0 flex-1 overflow-y-auto">
+              <ThoughtLine
+                fontSize={16}
+                color="var(--color-ink)"
+                working={running}
+                label={progress?.current?.messageId ? `Processing ${progress.current.messageId}` : "Starting…"}
+                doneLabel="Run finished in"
+                elapsed={finished?.seconds}
+                steps={progress ? progress.trace : finished?.trace}
+                glyph="sparkle"
+              />
             </div>
-            <div className="mt-1 text-[13px]">
-              <span className="tabular">{progress.harmful}</span> harmful ran · <span className="tabular">{progress.denied}</span> denied
+            <div className="mt-2 shrink-0 text-[13px]">
+              <span className="tabular">{shown.harmful}</span> harmful ran · <span className="tabular">{shown.denied}</span> denied
+              {!running && finished?.replay ? " · replayed from recorded answers" : ""}
             </div>
-          </div>
+          </>
         ) : (
           <div className="text-[14px]">{hasDataset ? "Pick a mode and run. Run OFF first to see the damage, then ON." : "Load a dataset to enable runs."}</div>
         )}

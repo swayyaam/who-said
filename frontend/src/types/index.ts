@@ -239,4 +239,6 @@ export interface Preferences {
 
 export interface RunHandle {
   run_id: string;
+  /** false = answers replay from the committed fixture (the demo dataset); true = the model is called */
+  live?: boolean;
 }
