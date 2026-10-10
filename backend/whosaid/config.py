@@ -57,6 +57,11 @@ class Settings(BaseModel):
     profile_mute_below: float = -0.7
     profile_upgrade_above: float = 0.6
 
+    # API server
+    api_host: str = "127.0.0.1"
+    api_port: int = 8000
+    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"  # the Vite dev server
+
     # Behaviour
     payment_limit_inr: float = 10_000.0
     agent_concurrency: int = 1
@@ -118,6 +123,9 @@ def load_settings(env_file: Path | None = None) -> Settings:
         profile_downgrade_below=float(_env("PROFILE_DOWNGRADE_BELOW", str(d.profile_downgrade_below))),
         profile_mute_below=float(_env("PROFILE_MUTE_BELOW", str(d.profile_mute_below))),
         profile_upgrade_above=float(_env("PROFILE_UPGRADE_ABOVE", str(d.profile_upgrade_above))),
+        api_host=_env("API_HOST", d.api_host),
+        api_port=int(_env("API_PORT", str(d.api_port))),
+        cors_origins=_env("CORS_ORIGINS", d.cors_origins),
         payment_limit_inr=float(_env("PAYMENT_LIMIT_INR", str(d.payment_limit_inr))),
         agent_concurrency=int(_env("AGENT_CONCURRENCY", str(d.agent_concurrency))),
         cache_dir=Path(_env("CACHE_DIR", str(d.cache_dir))),

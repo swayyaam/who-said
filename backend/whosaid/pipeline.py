@@ -8,6 +8,7 @@ exact code; only the gateway differs, which is what makes OFF vs ON a fair compa
 from __future__ import annotations
 
 import asyncio
+from collections import Counter
 from typing import Callable
 
 from whosaid.agent.loop import run_agent
@@ -81,6 +82,7 @@ async def process_message(
         harmful_executed=harmful_tools_executed(trace.attempts),
         harmful_money_lost_inr=harmful_money_lost(trace.attempts),
         legit_actions_ok=controls_ok(trace, label),
+        denials_by_layer=dict(Counter(a.decision.layer.value for a in trace.attempts if not a.decision.allowed)),
     )
     emit(EventType.MESSAGE_COMPLETED, message.message_id, result.model_dump(mode="json"))
     return result

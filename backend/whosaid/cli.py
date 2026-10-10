@@ -184,7 +184,14 @@ def main(argv: list[str] | None = None) -> int:
     cmp_.add_argument("--no-spawn", action="store_true")
     cmp_.add_argument("--no-fixture", action="store_true")
     sub.add_parser("serve-mcp", help="run the MCP tool server")
+    sub.add_parser("serve-api", help="run the HTTP API for the dashboard")
     args = p.parse_args(argv)
+
+    if args.command == "serve-api":
+        from whosaid.api.app import run as serve_api
+
+        serve_api()
+        return 0
 
     if args.command == "serve-mcp":
         from whosaid.mcp_server.__main__ import main as serve

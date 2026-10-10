@@ -161,3 +161,65 @@ class OracleGateway:
         out = await self._direct.call_tool(call)
         out.decision = AuthzDecision(allowed=True, tool=call.tool, reason=f"ALLOWED {call.tool}: AgntID checks passed", source="agntid", enforced=True)
         return out
+
+
+class InProcessAdmin:
+    """ToolServerAdmin look-alike over an in-process Store (no HTTP): the API tests' tool server."""
+
+    def __init__(self, store) -> None:
+        self._store = store
+
+    def healthy(self) -> bool:
+        return True
+
+    def reset(self) -> None:
+        self._store.reset()
+
+    def reset_and_seed(self, preferences) -> None:
+        self._store.reset()
+        for user_id, prefs in preferences.items():
+            self._store.set_preferences(user_id, prefs)
+
+    def state(self):
+        return self._store.snapshot()
+
+    def get_preferences(self, user_id):
+        return self._store.get_preferences(user_id)
+
+    def put_preferences(self, user_id, prefs):
+        return self._store.set_preferences(user_id, prefs)
+
+
+class InProcessBackend:
+    """A Backend for API tests: in-process tool server, the demo fixture (no model), the oracle standing in for AgntID."""
+
+    def __init__(self, server, store, *, agntid_reachable: bool = True) -> None:
+        self._server = server
+        self.admin = InProcessAdmin(store)
+        self._reachable = agntid_reachable
+
+    def start(self) -> None:
+        return None
+
+    def stop(self) -> None:
+        return None
+
+    def gateway_factory(self, enforcement):
+        from whosaid.schemas import Enforcement
+
+        return (lambda: DirectGateway(self._server)) if enforcement is Enforcement.OFF else (lambda: OracleGateway(self._server))
+
+    def make_llm(self, *, live: bool, is_demo: bool):
+        from whosaid.config import DEMO_FIXTURE_DIR
+        from whosaid.llm.factory import FixtureOnlyClient
+        from whosaid.cache import ContentCache
+        from whosaid.llm.cached import CachedLLM
+        import tempfile
+        from pathlib import Path
+
+        cache = ContentCache(Path(tempfile.mkdtemp()), read_only_fallbacks=(DEMO_FIXTURE_DIR,))
+        return CachedLLM(FixtureOnlyClient("qwen3.5:2b-mlx"), cache, provider="ollama", reasoning_effort="none")
+
+    def health(self):
+        return {"tool_server": {"healthy": True}, "agntid": {"endpoint": "test://agntid", "reachable": self._reachable},
+                "llm": {"provider": "ollama", "model": "qwen3.5:2b-mlx", "reasoning_effort": "none"}, "demo_fixture": {"entries": 1}}

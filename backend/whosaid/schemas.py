@@ -396,6 +396,7 @@ class MessageResult(BaseModel):
     harmful_executed: list[str] = Field(default_factory=list)
     harmful_money_lost_inr: float = 0.0
     legit_actions_ok: bool | None = None  # control messages only
+    denials_by_layer: dict[str, int] = Field(default_factory=dict)  # profile / policy / intent, this message only
 
 
 class TrustBreakdown(BaseModel):
