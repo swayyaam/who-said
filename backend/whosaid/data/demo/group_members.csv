@@ -1,0 +1,15 @@
+group_id,user_id,role,group_muted_by_user
+g_101,u_101,member,0
+g_101,u_102,admin,0
+g_101,u_103,admin,0
+g_101,u_104,member,0
+g_102,u_106,member,0
+g_102,u_107,member,0
+g_102,u_108,admin,0
+g_103,u_107,member,0
+g_103,u_109,admin,0
+g_103,u_110,member,0
+g_104,u_108,member,0
+g_104,u_111,admin,0
+g_104,u_112,member,0
+g_104,u_109,member,0

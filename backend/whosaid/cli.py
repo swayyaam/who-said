@@ -1,0 +1,128 @@
+"""Command line: run a dataset through the pipeline and print what happened.
+
+    whosaid run --dataset demo --enforcement off
+    whosaid serve-mcp          # the tool server, as its own process
+"""
+
+from __future__ import annotations
+
+import argparse
+import asyncio
+import shutil
+import sys
+import tempfile
+from pathlib import Path
+
+from rich.console import Console
+
+from whosaid.agent.gateways import gateway_factory
+from whosaid.config import DEMO_DATA_DIR, DEMO_FIXTURE_DIR, Settings, load_settings
+from whosaid.errors import WhoSaidError
+from whosaid.ingest import load_dataset_dir
+from whosaid.llm import build_llm
+from whosaid.logging_setup import setup_logging
+from whosaid.mcp_server.admin import ensure_tool_server
+from whosaid.pipeline import run_dataset
+from whosaid.report import render_result, render_summary
+from whosaid.schemas import Enforcement
+from whosaid.summary import summarize
+
+
+def _resolve_dataset(arg: str):
+    path = DEMO_DATA_DIR if arg == "demo" else Path(arg)
+    return load_dataset_dir(path, name="demo" if arg == "demo" else None)
+
+
+async def _run(args: argparse.Namespace, settings: Settings, console: Console) -> int:
+    dataset = _resolve_dataset(args.dataset)
+    enforcement = Enforcement(args.enforcement)
+    use_fixture = args.dataset == "demo" and not args.no_fixture
+    llm = build_llm(settings, fixture_dir=DEMO_FIXTURE_DIR if use_fixture else None)
+    console.rule(f"[bold]WhoSaid[/] · dataset {dataset.name} ({len(dataset.messages)} messages) · AgntID {enforcement.value.upper()} · {llm.model}{' · demo fixture cache' if use_fixture else ''}")
+    try:
+        with ensure_tool_server(settings, spawn=not args.no_spawn) as admin:
+            admin.reset()
+            results = await run_dataset(
+                dataset, llm=llm, gateway_factory=gateway_factory(settings, enforcement), settings=settings,
+                on_result=lambda r: render_result(console, r), only=set(args.only) if args.only else None,
+                limit=args.limit, concurrency=args.concurrency,
+            )
+            state = admin.state()
+    finally:
+        await llm.aclose()
+    console.print()
+    render_summary(console, summarize(results, enforcement=enforcement, model=llm.model, dataset_id=dataset.dataset_id))
+    spent = sum(e.amount_inr for e in state.ledger if e.tool == "pay_upi" and e.status == "ok")
+    console.print(f"[dim]tool-server ledger: ₹{spent:,.0f} actually paid out · {len(state.ledger)} effect(s) recorded[/]")
+    return 0
+
+
+async def _refresh_fixture(args: argparse.Namespace, settings: Settings, console: Console) -> int:
+    """Re-record the committed demo fixture by running the demo against the real model."""
+    tmp = Path(tempfile.mkdtemp(prefix="whosaid-fixture-"))
+    scratch = settings.model_copy(update={"cache_dir": tmp})
+    modes = ["off", "on"] if args.enforcement == "both" else [args.enforcement]
+    try:
+        for mode in modes:
+            run_args = argparse.Namespace(dataset="demo", enforcement=mode, only=None, limit=None, concurrency=1,
+                                          no_spawn=args.no_spawn, no_fixture=True)
+            await _run(run_args, scratch, console)
+        target = DEMO_FIXTURE_DIR / "llm"
+        if target.exists() and not args.merge:
+            shutil.rmtree(target)
+        shutil.copytree(tmp / "llm", target, dirs_exist_ok=True)
+        count = sum(1 for _ in target.rglob("*.json"))
+        console.print(f"[bold green]fixture refreshed:[/] {count} recorded LLM answer(s) in {target}")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    p = argparse.ArgumentParser(prog="whosaid")
+    sub = p.add_subparsers(dest="command", required=True)
+    run = sub.add_parser("run", help="run a dataset through the agent")
+    run.add_argument("--dataset", default="demo", help="'demo' or a folder of CSVs")
+    run.add_argument("--enforcement", choices=["off", "on"], default="off")
+    run.add_argument("--only", nargs="*", help="only these message ids")
+    run.add_argument("--limit", type=int)
+    run.add_argument("--concurrency", type=int)
+    run.add_argument("--model", help="override LLM_MODEL")
+    run.add_argument("--no-fixture", action="store_true", help="do not use the committed demo fixture cache")
+    run.add_argument("--no-spawn", action="store_true", help="do not start the tool server if it is not running")
+    run.add_argument("--verbose", action="store_true", help="print the JSON event log to stderr")
+    fx = sub.add_parser("refresh-fixture", help="re-record the committed demo fixture against the real model")
+    fx.add_argument("--enforcement", choices=["off", "on", "both"], default="off")
+    fx.add_argument("--merge", action="store_true", help="add to the existing fixture instead of replacing it")
+    fx.add_argument("--no-spawn", action="store_true")
+    sub.add_parser("serve-mcp", help="run the MCP tool server")
+    args = p.parse_args(argv)
+
+    if args.command == "serve-mcp":
+        from whosaid.mcp_server.__main__ import main as serve
+
+        serve()
+        return 0
+
+    settings = load_settings()
+    if getattr(args, "model", None):
+        settings = settings.model_copy(update={"llm_model": args.model})
+    if getattr(args, "verbose", False):
+        setup_logging(settings.log_level)
+    else:
+        settings.cache_dir.mkdir(parents=True, exist_ok=True)
+        setup_logging(settings.log_level, stream=open(settings.cache_dir / "whosaid.log", "a", encoding="utf-8"))
+    console = Console()
+    try:
+        if args.command == "refresh-fixture":
+            return asyncio.run(_refresh_fixture(args, settings, console))
+        return asyncio.run(_run(args, settings, console))
+    except WhoSaidError as exc:
+        console.print(f"[bold red]error:[/] {exc}")
+        for problem in getattr(exc, "problems", [])[1:]:
+            console.print(f"  - {problem}")
+        return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

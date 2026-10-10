@@ -29,12 +29,13 @@ whosaid = "whosaid.cli:main"
 include = ["whosaid*"]
 
 [tool.setuptools.package-data]
-whosaid = ["data/demo/*.csv"]
+whosaid = ["data/demo/*.csv", "data/demo/cache/llm/*/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 addopts = "-q"
+filterwarnings = ["ignore::DeprecationWarning", "ignore:.*Authlib.*"]
 
 [tool.ruff]
 line-length = 100

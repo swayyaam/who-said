@@ -1,0 +1,9 @@
+business_id,display_name,brand_name,category,verified,official_domain,domain_used_by_sender,account_age_days,messages_sent_30d,user_reports_30d,domain_used_by_sender_age_days
+b_101,VoltEdge Power,VoltEdge Power,utilities,1,voltedge.in,voltedge.in,2410,3120,4,2100
+b_102,PayRail Settlements,PayRail Settlements,payments,1,payrail.in,payrail.in,1902,5210,7,1750
+b_103,NorthGrid Electricity Bill Desk,NorthGrid,utilities,0,northgrid.co.in,northgrid-billpay.in,6,912,47,4
+b_104,StyleHub,StyleHub,fashion,1,stylehub.in,stylehub.in,1307,1673,6,1019
+b_105,Meridian Bank,Meridian Bank,bank,1,meridianbank.in,meridianbank.in,3650,8421,9,3300
+b_106,Quickbite,Quickbite,food_delivery,1,quickbite.in,quickbite.in,980,4310,5,900
+b_107,Lumina Survey Co,Lumina Survey Co,marketing,0,,luminasurvey.in,95,640,11,80
+b_108,Meridian Bank KYC Desk,Meridian Bank,bank,0,meridianbank.in,meridian-kyc.in,12,1544,63,9

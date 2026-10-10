@@ -1,0 +1,6 @@
+user_id,business_id,why_user_knows_account,allows_promotions,promotions_opted_out_at
+u_101,b_101,monthly_electricity_payment,1,
+u_101,b_102,society_collections_payout,1,
+u_109,b_104,old_sale_subscription,0,2026-07-10 09:00
+u_109,b_105,active_bank_account,1,
+u_109,b_106,frequent_food_orders,1,

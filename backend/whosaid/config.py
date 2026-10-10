@@ -14,6 +14,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 DEMO_DATA_DIR = Path(__file__).resolve().parent / "data" / "demo"
+# Committed LLM answers for the demo dataset only (not covered by the .cache/ gitignore).
+DEMO_FIXTURE_DIR = DEMO_DATA_DIR / "cache"
 
 
 class Settings(BaseModel):
