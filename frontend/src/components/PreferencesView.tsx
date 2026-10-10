@@ -52,7 +52,7 @@ export function PreferencesView({ runs }: { runs: Runs }) {
         <Col tag="AgntID ON" title={runs.on ? "Unchanged" : "Not run yet"} prefs={runs.on ? before : null} tone={runs.on ? "bg-mint" : "border border-dashed border-hairline"} />
       </div>
       {runs.on && onT && !onT.after && <p className="mt-4 text-[14px]">AgntID ON denied the <span className="t-mono">update_preferences</span> call at the policy layer.</p>}
-      {live && <p className="mt-2 text-[13px]">Live on server: auto-pay senders · <span className="t-mono">{prefValue(live, "auto_pay_senders")}</span></p>}
+      {live && <p className="mt-2 text-[13px]">Live on server after the latest run: auto-pay senders · <span className="t-mono">{prefValue(live, "auto_pay_senders")}</span></p>}
     </div>
   );
 }

@@ -69,6 +69,7 @@ export const mockApi: WhoSaidApi = {
 
   async startRun(_datasetId, enforcement) {
     await sleep(200);
+    prefs.clear(); // each real run reseeds the tool server, so preferences start clean
     const run_id = `mock_${enforcement}_${++counter}`;
     const src = enforcement === "on" ? on : off;
     const detail: RunDetail = {

@@ -12,8 +12,8 @@ function Args({ title, note, data, tone }: { title: string; note: string; data: 
       {entries.length === 0 ? <div className="text-[13px]">none</div> : (
         <dl className="space-y-1">
           {entries.map(([k, v]) => (
-            <div key={k} className="grid grid-cols-[110px_1fr] gap-2 text-[13px]">
-              <dt className="t-mono truncate">{k}</dt>
+            <div key={k} className="grid grid-cols-[140px_1fr] gap-2 text-[13px]">
+              <dt className="t-mono">{k}</dt>
               <dd className="t-mono break-all">{typeof v === "string" ? (v === "" ? "(empty)" : v) : JSON.stringify(v)}</dd>
             </div>
           ))}
@@ -34,7 +34,7 @@ function ToolCallCard({ a, index }: { a: ToolAttempt; index: number }) {
         <span className="t-eyebrow">{verdict}</span>
       </div>
       <div className="space-y-3 p-4">
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3">
           <Args title="Proposed by the model" note="Chosen by the LLM" data={a.call.model_args} tone="bg-soft" />
           <Args title="Trusted arguments" note="Set by code, not the model" data={a.call.trusted_args} tone="bg-cream" />
         </div>
