@@ -55,3 +55,11 @@ filled in (see `backend/.env.example`), `backend/.venv`, and `npm install` in `f
 
 Logs and PID files are in `logs/` (gitignored). Set `DEMO_WEB_PORT` to use a different frontend
 port. A frontend you started yourself is reused as-is (its data mode is not known to the script).
+
+### Single-message cases
+
+Three built-in datasets show one case at a time (`GET /datasets`; they replay from committed fixtures like the demo):
+`case-allowed` ("Case: allowed", the admin's real maintenance reminder is paid in both modes),
+`case-blocked` ("Case: blocked by AgntID", a changed UPI ID is paid when OFF and denied by policy when ON) and
+`case-muted` ("Case: muted", a look-alike bank KYC scam the router mutes before the agent runs).
+Re-record one with `whosaid refresh-fixture --dataset case-blocked --enforcement both`.

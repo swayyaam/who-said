@@ -1,0 +1,2 @@
+message_id,user_id,conversation_type,group_id,business_id,sender_user_id,created_at,message_text,media_type,media_id,forwarded_count
+msg_115,u_110,business,,b_108,,2026-07-31 11:30,Your account KYC is incomplete. Update your details at meridian-kyc.in/update within 24 hours to avoid suspension.,,,0

@@ -26,7 +26,7 @@ from whosaid.api.backend import Backend, LiveBackend
 from whosaid.api.runner import execute_run
 from whosaid.api.state import AppState
 from whosaid.config import Settings, load_settings
-from whosaid.datasets import DatasetRegistry, describe, preview
+from whosaid.datasets import DatasetRegistry, preview
 from whosaid.errors import DatasetError
 from whosaid.logging_setup import setup_logging
 from whosaid.profile import Preferences
@@ -98,14 +98,14 @@ def create_app(settings: Settings | None = None, backend: Backend | None = None)
             dataset = state.datasets.add_upload(blobs, name=name)
         except DatasetError as exc:
             raise HTTPException(422, detail={"message": str(exc), "problems": exc.problems}) from exc
-        return describe(dataset, is_demo=state.datasets.is_demo(dataset.dataset_id)).model_dump()
+        return state.datasets.info(dataset).model_dump()
 
     @app.get("/datasets/{dataset_id}")
     async def get_dataset(dataset_id: str) -> dict[str, Any]:
         dataset = state.datasets.get(dataset_id)
         if dataset is None:
             raise HTTPException(404, detail=f"no dataset {dataset_id!r}")
-        info = describe(dataset, is_demo=state.datasets.is_demo(dataset_id)).model_dump()
+        info = state.datasets.info(dataset).model_dump()
         return {**info, "message_list": [m.model_dump() for m in preview(dataset)]}
 
     # ---- runs ------------------------------------------------------------------------------
@@ -115,9 +115,9 @@ def create_app(settings: Settings | None = None, backend: Backend | None = None)
         dataset = state.datasets.get(req.dataset_id)
         if dataset is None:
             raise HTTPException(404, detail=f"no dataset {req.dataset_id!r}")
-        is_demo = state.datasets.is_demo(req.dataset_id)
+        has_fixture = state.datasets.fixture_dir(req.dataset_id) is not None
         requested = settings.default_live if req.live is None else req.live
-        live = requested or not is_demo  # only the demo has a fixture; anything else needs the model
+        live = requested or not has_fixture  # only the built-in datasets have a fixture; anything else needs the model
         if req.enforcement is Enforcement.ON:
             health_ = await asyncio.to_thread(backend.health)
             if not health_.get("agntid", {}).get("reachable", True):

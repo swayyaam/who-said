@@ -1,0 +1,4 @@
+user_id,message_id,message_opened,message_replied,reaction_time_minutes,notification_dismissed,muted_after_message,message_reported
+u_101,hist_g1,1,1,2,0,0,0
+u_101,hist_g2,1,0,,0,0,0
+u_101,hist_g3,1,0,,0,0,0

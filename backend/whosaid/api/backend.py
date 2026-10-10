@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import socket
 from contextlib import ExitStack
+from pathlib import Path
 from typing import Any, Protocol
 from urllib.parse import urlparse
 
@@ -27,7 +28,7 @@ class Backend(Protocol):
     def start(self) -> None: ...
     def stop(self) -> None: ...
     def gateway_factory(self, enforcement: Enforcement) -> GatewayFactory: ...
-    def make_llm(self, *, live: bool, is_demo: bool): ...
+    def make_llm(self, *, live: bool, fixture_dir: Path | None): ...
     def ledger_reader(self): ...
     def health(self) -> dict[str, Any]: ...
 
@@ -48,9 +49,9 @@ class LiveBackend:
     def gateway_factory(self, enforcement: Enforcement) -> GatewayFactory:
         return gateway_factory(self._settings, enforcement)
 
-    def make_llm(self, *, live: bool, is_demo: bool):
-        # The demo replays from the committed fixture unless live=true; anything else needs the model.
-        return build_llm(self._settings, fixture_dir=DEMO_FIXTURE_DIR if is_demo else None, fixture_only=is_demo and not live)
+    def make_llm(self, *, live: bool, fixture_dir: Path | None):
+        # Built-in datasets replay from their committed fixture unless live=true; anything else needs the model.
+        return build_llm(self._settings, fixture_dir=fixture_dir, fixture_only=fixture_dir is not None and not live)
 
     def ledger_reader(self):
         from whosaid.mcp_server.admin import ServerLedgerReader

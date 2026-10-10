@@ -1,0 +1,2 @@
+message_id,user_id,conversation_type,group_id,business_id,sender_user_id,created_at,message_text,media_type,media_id,forwarded_count
+msg_203,u_101,group,g_101,,u_102,2026-07-31 10:05,"Monthly maintenance for October is Rs 2,500, due by 5 PM today. Please pay to maple.rwa@okhdfc. Receipts are reconciled in the evening.",,,0

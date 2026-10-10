@@ -16,7 +16,8 @@ from pathlib import Path
 from rich.console import Console
 
 from whosaid.agent.gateways import gateway_factory
-from whosaid.config import DEMO_DATA_DIR, DEMO_FIXTURE_DIR, Settings, load_settings, profile_params
+from whosaid.config import CASES_DATA_DIR, DEMO_DATA_DIR, DEMO_FIXTURE_DIR, Settings, load_settings, profile_params
+from whosaid.datasets import CASES
 from whosaid.errors import WhoSaidError
 from whosaid.ingest import load_dataset_dir
 from whosaid.llm import build_llm
@@ -29,7 +30,21 @@ from whosaid.schemas import Enforcement
 from whosaid.summary import summarize
 
 
+def _case_names() -> dict[str, str]:
+    return dict(CASES)
+
+
+def _fixture_dir(arg: str) -> Path | None:
+    if arg == "demo":
+        return DEMO_FIXTURE_DIR
+    return CASES_DATA_DIR / arg / "cache" if arg in _case_names() else None
+
+
 def _resolve_dataset(arg: str):
+    if arg in _case_names():
+        from dataclasses import replace
+
+        return replace(load_dataset_dir(CASES_DATA_DIR / arg, name=_case_names()[arg]), dataset_id=arg)
     path = DEMO_DATA_DIR if arg == "demo" else Path(arg)
     return load_dataset_dir(path, name="demo" if arg == "demo" else None)
 
@@ -38,8 +53,9 @@ async def _run(args: argparse.Namespace, settings: Settings, console: Console, *
     """Run the dataset once. Returns (results, summary)."""
     dataset = _resolve_dataset(args.dataset)
     enforcement = Enforcement(args.enforcement)
-    use_fixture = args.dataset == "demo" and not args.no_fixture
-    llm = build_llm(settings, fixture_dir=DEMO_FIXTURE_DIR if use_fixture else None)
+    fixture = None if args.no_fixture else _fixture_dir(args.dataset)
+    use_fixture = fixture is not None
+    llm = build_llm(settings, fixture_dir=fixture)
     console.rule(f"[bold]WhoSaid[/] · dataset {dataset.name} ({len(dataset.messages)} messages) · AgntID {enforcement.value.upper()} · {llm.model}{' · demo fixture cache' if use_fixture else ''}")
     try:
         with ensure_tool_server(settings, spawn=not args.no_spawn) as admin:
@@ -128,15 +144,17 @@ def _cmd_profile(args: argparse.Namespace, console: Console) -> int:
 
 async def _refresh_fixture(args: argparse.Namespace, settings: Settings, console: Console) -> int:
     """Re-record the committed demo fixture by running the demo against the real model."""
+    if _fixture_dir(args.dataset) is None:
+        raise WhoSaidError(f"{args.dataset!r} has no committed fixture; use demo or a case id")
     tmp = Path(tempfile.mkdtemp(prefix="whosaid-fixture-"))
     scratch = settings.model_copy(update={"cache_dir": tmp})
     modes = ["off", "on"] if args.enforcement == "both" else [args.enforcement]
     try:
         for mode in modes:
-            run_args = argparse.Namespace(dataset="demo", enforcement=mode, only=None, limit=None, concurrency=1,
+            run_args = argparse.Namespace(dataset=args.dataset, enforcement=mode, only=None, limit=None, concurrency=1,
                                           no_spawn=args.no_spawn, no_fixture=True)
             await _run(run_args, scratch, console, quiet=True)
-        target = DEMO_FIXTURE_DIR / "llm"
+        target = _fixture_dir(args.dataset) / "llm"
         if target.exists() and not args.merge:
             shutil.rmtree(target)
         shutil.copytree(tmp / "llm", target, dirs_exist_ok=True)
@@ -162,6 +180,7 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--verbose", action="store_true", help="print the JSON event log to stderr")
     fx = sub.add_parser("refresh-fixture", help="re-record the committed demo fixture against the real model")
     fx.add_argument("--enforcement", choices=["off", "on", "both"], default="off")
+    fx.add_argument("--dataset", default="demo", help="'demo' or one of the case ids (case-allowed, case-blocked, case-muted)")
     fx.add_argument("--merge", action="store_true", help="add to the existing fixture instead of replacing it")
     fx.add_argument("--no-spawn", action="store_true")
     pf = sub.add_parser("prefs", help="show/set/clear a user's explicit preferences on the running tool server")

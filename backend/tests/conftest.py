@@ -212,7 +212,7 @@ class InProcessBackend:
 
         return (lambda: DirectGateway(self._server)) if enforcement is Enforcement.OFF else (lambda: OracleGateway(self._server))
 
-    def make_llm(self, *, live: bool, is_demo: bool):
+    def make_llm(self, *, live: bool, fixture_dir=None):
         from whosaid.config import DEMO_FIXTURE_DIR
         from whosaid.llm.factory import FixtureOnlyClient
         from whosaid.cache import ContentCache
@@ -220,7 +220,7 @@ class InProcessBackend:
         import tempfile
         from pathlib import Path
 
-        cache = ContentCache(Path(tempfile.mkdtemp()), read_only_fallbacks=(DEMO_FIXTURE_DIR,))
+        cache = ContentCache(Path(tempfile.mkdtemp()), read_only_fallbacks=tuple(p for p in (fixture_dir, DEMO_FIXTURE_DIR) if p))
         return CachedLLM(FixtureOnlyClient("qwen3.5:2b-mlx"), cache, provider="ollama", reasoning_effort="none")
 
     def ledger_reader(self):

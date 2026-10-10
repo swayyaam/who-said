@@ -129,6 +129,7 @@ def build_comparison(off: RunRecord, on: RunRecord) -> dict[str, Any]:
             })
     a, b = off.summary, on.summary
     paid_ok = round(b.total_money_moved_inr - b.harmful_money_lost_inr, 2)  # money the ON run moved that was NOT harmful
+    outcome, text, loss_text, legit_text = describe_outcome(a, b, paid_ok)
     return {
         "dataset_id": a.dataset_id,
         "off": a.model_dump(mode="json"),
@@ -136,14 +137,51 @@ def build_comparison(off: RunRecord, on: RunRecord) -> dict[str, Any]:
         "headline": {
             "off_harmful_executed": a.harmful_executed, "off_money_lost_inr": a.harmful_money_lost_inr,
             "on_harmful_executed": b.harmful_executed, "on_money_lost_inr": b.harmful_money_lost_inr,
-            "text": (f"OFF: {a.harmful_executed} harmful actions executed, ₹{a.harmful_money_lost_inr:,.0f} lost. "
-                     f"ON: {b.harmful_executed}, ₹{b.harmful_money_lost_inr:,.0f}."),
-            "loss_text": f"₹{a.harmful_money_lost_inr:,.0f} → ₹{b.harmful_money_lost_inr:,.0f}",
+            "outcome": outcome,
+            "text": text,
+            "loss_text": loss_text,
             # Proof that AgntID keeps the agent useful, not just blocked: what the ON run still did correctly.
             "on_controls_ok": b.controls_ok,
             "on_controls_total": b.controls_total,
             "on_legit_paid_inr": paid_ok,
-            "legit_text": f"{b.controls_ok}/{b.controls_total} legitimate actions still work · ₹{paid_ok:,.0f} paid correctly",
+            "legit_text": legit_text,
         },
         "differing": differing,
     }
+
+
+def describe_outcome(a: RunSummary, b: RunSummary, paid_ok: float) -> tuple[str, str, str, str]:
+    """(outcome, text, loss_text, legit_text) for the comparison headline.
+
+    ``outcome`` says which story the pair of runs tells: ``blocked`` (OFF did harm, ON stopped it), ``allowed``
+    (nothing harmful, a legitimate action went through), ``muted`` (the router stopped it before any agent ran),
+    ``quiet`` (nothing harmful, nothing to act on) or ``leak`` (ON still let harm through). A run with nothing at
+    stake never gets "₹0 lost → ₹0" wording."""
+    if a.harmful_executed == 0 and b.harmful_executed == 0:
+        if a.agent_runs == 0 and b.agent_runs == 0:
+            muted = a.by_action.get("mute", 0)
+            if muted:
+                return ("muted", f"Muted before the agent ran: {muted} message(s) stopped by the router, no tool calls, same with AgntID OFF and ON.",
+                        "Nothing at risk", "No agent action needed")
+            return "quiet", "No agent action was needed in either run.", "Nothing at risk", "No agent action needed"
+        if b.controls_total and b.controls_ok == b.controls_total:
+            paid = f" · ₹{paid_ok:,.0f} paid correctly" if paid_ok else ""
+            legit = f"{b.controls_ok}/{b.controls_total} legitimate actions still work{paid}"
+            return "allowed", f"Allowed: the legitimate request went through with AgntID OFF and ON{paid}.", "Nothing at risk", legit
+        return "quiet", "Nothing harmful happened in either run.", "Nothing at risk", (
+            f"{b.controls_ok}/{b.controls_total} legitimate actions still work" if b.controls_total else "No legitimate actions to check")
+    legit = (f"{b.controls_ok}/{b.controls_total} legitimate actions still work · ₹{paid_ok:,.0f} paid correctly"
+             if b.controls_total else "No legitimate actions in this dataset")
+    outcome = "blocked" if b.harmful_executed == 0 else "leak"
+    if a.harmful_money_lost_inr or b.harmful_money_lost_inr:
+        text = (f"OFF: {_harmful(a.harmful_executed)} executed, ₹{a.harmful_money_lost_inr:,.0f} lost. "
+                f"ON: {b.harmful_executed}, ₹{b.harmful_money_lost_inr:,.0f}.")
+        loss = f"₹{a.harmful_money_lost_inr:,.0f} → ₹{b.harmful_money_lost_inr:,.0f}"
+    else:
+        text = f"OFF: {_harmful(a.harmful_executed)} executed. ON: {b.harmful_executed}."
+        loss = f"{_harmful(a.harmful_executed)} → {b.harmful_executed}"
+    return outcome, text, loss, legit
+
+
+def _harmful(n: int) -> str:
+    return f"{n} harmful action{'' if n == 1 else 's'}"

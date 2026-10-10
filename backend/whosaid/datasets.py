@@ -2,11 +2,22 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+from pathlib import Path
+
 from pydantic import BaseModel
 
-from whosaid.config import DEMO_DATA_DIR
+from whosaid.config import CASES_DATA_DIR, DEMO_DATA_DIR, DEMO_FIXTURE_DIR
 from whosaid.ingest import Dataset, load_dataset_dir, load_dataset_files
 from whosaid.schemas import ScenarioKind
+
+
+# Single-message datasets for showing one case at a time: (folder = dataset id, display name).
+CASES: tuple[tuple[str, str], ...] = (
+    ("case-allowed", "Case: allowed"),
+    ("case-blocked", "Case: blocked by AgntID"),
+    ("case-muted", "Case: muted"),
+)
 
 
 class DatasetInfo(BaseModel):
@@ -32,13 +43,14 @@ class MessagePreview(BaseModel):
     kind: str | None = None
 
 
-def describe(dataset: Dataset, *, is_demo: bool) -> DatasetInfo:
+def describe(dataset: Dataset, *, is_demo: bool, fixture_available: bool | None = None) -> DatasetInfo:
     kinds = [l.kind for l in dataset.labels.values()]
     return DatasetInfo(
         dataset_id=dataset.dataset_id, name=dataset.name, messages=len(dataset.messages),
         users=len({m.user_id for m in dataset.messages}),
         attacks=sum(k is ScenarioKind.ATTACK for k in kinds), controls=sum(k is ScenarioKind.CONTROL for k in kinds),
-        is_demo=is_demo, files=list(dataset.files), fixture_available=is_demo,
+        is_demo=is_demo, files=list(dataset.files),
+        fixture_available=is_demo if fixture_available is None else fixture_available,
     )
 
 
@@ -59,6 +71,13 @@ class DatasetRegistry:
         demo = load_dataset_dir(DEMO_DATA_DIR, name="demo")
         self._demo_id = demo.dataset_id
         self._datasets: dict[str, Dataset] = {demo.dataset_id: demo}
+        self._fixtures: dict[str, Path] = {demo.dataset_id: DEMO_FIXTURE_DIR}
+        self._built_in = {demo.dataset_id}
+        for case_id, display in CASES:  # recorded like the demo, so they replay deterministically
+            case = replace(load_dataset_dir(CASES_DATA_DIR / case_id, name=display), dataset_id=case_id)
+            self._datasets[case_id] = case
+            self._fixtures[case_id] = CASES_DATA_DIR / case_id / "cache"
+            self._built_in.add(case_id)
 
     @property
     def demo_id(self) -> str:
@@ -79,11 +98,18 @@ class DatasetRegistry:
     def is_demo(self, dataset_id: str) -> bool:
         return dataset_id == self._demo_id
 
+    def fixture_dir(self, dataset_id: str) -> Path | None:
+        """The committed model answers for a built-in dataset (the demo and the cases); None for uploads."""
+        return self._fixtures.get(dataset_id)
+
+    def info(self, dataset: Dataset) -> DatasetInfo:
+        return describe(dataset, is_demo=self.is_demo(dataset.dataset_id), fixture_available=dataset.dataset_id in self._fixtures)
+
     def infos(self) -> list[DatasetInfo]:
-        return [describe(d, is_demo=self.is_demo(i)) for i, d in self._datasets.items()]
+        return [self.info(d) for d in self._datasets.values()]
 
     def clear_uploads(self) -> int:
-        gone = [i for i in self._datasets if i != self._demo_id]
+        gone = [i for i in self._datasets if i not in self._built_in]
         for i in gone:
             del self._datasets[i]
         return len(gone)

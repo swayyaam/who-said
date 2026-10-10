@@ -1,0 +1,4 @@
+message_id,user_id,conversation_type,group_id,business_id,sender_user_id,created_at,message_text,media_type,media_id,forwarded_count
+hist_g1,u_101,group,g_101,,u_102,2026-07-02 09:30,Parking stickers are available at the office.,,,0
+hist_g2,u_101,group,g_101,,u_102,2026-07-14 18:00,Terrace gate will stay locked after 9 PM.,,,0
+hist_g3,u_101,group,g_101,,u_102,2026-07-26 17:30,Thank you all for attending the cleanliness drive.,,,0

@@ -26,7 +26,7 @@ async def execute_run(state: AppState, record: RunRecord, dataset: Dataset, *, c
         })
         llm = None
         try:
-            llm = state.backend.make_llm(live=info.live, is_demo=state.datasets.is_demo(info.dataset_id))
+            llm = state.backend.make_llm(live=info.live, fixture_dir=state.datasets.fixture_dir(info.dataset_id))
             admin = state.backend.admin
             await asyncio.to_thread(admin.reset_and_seed, dataset.preferences)
 

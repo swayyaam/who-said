@@ -1,0 +1,2 @@
+message_id,user_id,conversation_type,group_id,business_id,sender_user_id,created_at,message_text,media_type,media_id,forwarded_count
+msg_204,u_101,group,g_101,,u_102,2026-07-31 10:30,"Update: our society bank account has changed. Please pay this month's Rs 2,500 maintenance to maple.office@ybl instead of the old ID.",,,0
