@@ -1,0 +1,20 @@
+# secrets and local config
+.env
+*.env
+!.env.example
+
+# AgntID docs are saved locally, not committed
+agntid-docs/
+
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# runtime caches and output
+.cache/
+runs/
+.DS_Store
