@@ -75,5 +75,8 @@ def decide(tool: str, args: dict[str, Any]) -> tuple[bool, str]:
             return False, f"DENIED {tool}: amount must be positive"
         if float(args.get("amount_inr", 0)) > PAYMENT_LIMIT_INR:
             return False, f"DENIED {tool}: amount exceeds the limit of {PAYMENT_LIMIT_INR:,.0f} INR"
+        # The limit is cumulative per payee: splitting a payment into small ones cannot get around it.
+        if float(args.get("amount_inr", 0)) + float(args.get("paid_today_to_payee") or 0) > PAYMENT_LIMIT_INR:
+            return False, f"DENIED {tool}: amount plus what was already paid to this payee exceeds the limit of {PAYMENT_LIMIT_INR:,.0f} INR"
 
     return True, f"ALLOWED {tool}: permitted for sender {trust}"

@@ -38,6 +38,7 @@ async def execute_run(state: AppState, record: RunRecord, dataset: Dataset, *, c
                 dataset, llm=llm, gateway_factory=state.backend.gateway_factory(info.enforcement), settings=state.settings,
                 emit=lambda t, mid, data: bus.publish(run_id, t, mid, data), on_result=on_result, only=only,
                 concurrency=concurrency, preferences=ServerPreferenceReader(admin), profile_params=profile_params(state.settings),
+                ledger=state.backend.ledger_reader(),
             )
             record.results = results  # dataset order
             tool_state = await asyncio.to_thread(admin.state)

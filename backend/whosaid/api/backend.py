@@ -28,6 +28,7 @@ class Backend(Protocol):
     def stop(self) -> None: ...
     def gateway_factory(self, enforcement: Enforcement) -> GatewayFactory: ...
     def make_llm(self, *, live: bool, is_demo: bool): ...
+    def ledger_reader(self): ...
     def health(self) -> dict[str, Any]: ...
 
 
@@ -50,6 +51,11 @@ class LiveBackend:
     def make_llm(self, *, live: bool, is_demo: bool):
         # The demo replays from the committed fixture unless live=true; anything else needs the model.
         return build_llm(self._settings, fixture_dir=DEMO_FIXTURE_DIR if is_demo else None, fixture_only=is_demo and not live)
+
+    def ledger_reader(self):
+        from whosaid.mcp_server.admin import ServerLedgerReader
+
+        return ServerLedgerReader(self.admin)
 
     def health(self) -> dict[str, Any]:
         s = self._settings

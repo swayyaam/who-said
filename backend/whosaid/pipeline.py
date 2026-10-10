@@ -17,6 +17,7 @@ from whosaid.config import Settings
 from whosaid.errors import GatewayError
 from whosaid.events import Emitter, noop_emit
 from whosaid.ingest.dataset import Dataset
+from whosaid.ledger import PaidReader
 from whosaid.llm.base import LLMClient
 from whosaid.logging_setup import log_event
 from whosaid.profile import InMemoryPreferenceReader, PreferenceReader, ProfileBook, ProfileParams, seed_book
@@ -39,6 +40,7 @@ async def process_message(
     preferences: PreferenceReader,
     profiles: ProfileBook,
     emit: Emitter = noop_emit,
+    ledger: PaidReader | None = None,
 ) -> MessageResult:
     emit(EventType.MESSAGE_STARTED, message.message_id, {"user_id": message.user_id})
     trust = trust_provider.assess(message)
@@ -62,7 +64,7 @@ async def process_message(
                 trace = await run_agent(
                     llm=llm, gateway=gateway, message=message, trust=trust, nonce_secret=settings.nonce_secret,
                     media_description=media.description if media else None, max_turns=settings.agent_max_turns, emit=emit,
-                    routing=routing,
+                    routing=routing, ledger=ledger,
                 )
         except GatewayError as exc:  # e.g. the enforcement point is unreachable: record it, keep the run going
             trace = AgentTrace(ran=True, error=f"{type(exc).__name__}: {exc}")
@@ -101,6 +103,7 @@ async def run_dataset(
     concurrency: int | None = None,
     preferences: PreferenceReader | None = None,
     profile_params: ProfileParams | None = None,
+    ledger: PaidReader | None = None,
 ) -> list[MessageResult]:
     """Process the dataset's messages (optionally filtered). Results come back in dataset order.
 
@@ -120,7 +123,7 @@ async def run_dataset(
             result = await process_message(
                 message, dataset=dataset, trust_provider=trust_provider, llm=llm,  # type: ignore[arg-type]
                 gateway_factory=gateway_factory, settings=settings, preferences=preferences,
-                profiles=profiles, emit=emit,
+                profiles=profiles, emit=emit, ledger=ledger,
             )
         if on_result:
             on_result(result)

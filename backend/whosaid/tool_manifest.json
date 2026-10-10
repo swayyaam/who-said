@@ -69,6 +69,17 @@
       }
      ],
      "default": null
+    },
+    "paid_today_to_payee": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null
     }
    },
    "type": "object"
@@ -141,6 +152,17 @@
      "default": null
     },
     "allowed_recipients": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null
+    },
+    "paid_today_to_payee": {
      "anyOf": [
       {
        "type": "string"
@@ -226,6 +248,17 @@
      "default": null
     },
     "allowed_recipients": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null
+    },
+    "paid_today_to_payee": {
      "anyOf": [
       {
        "type": "string"
@@ -331,6 +364,17 @@
       }
      ],
      "default": null
+    },
+    "paid_today_to_payee": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null
     }
    },
    "required": [
@@ -401,6 +445,17 @@
      "default": null
     },
     "allowed_recipients": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null
+    },
+    "paid_today_to_payee": {
      "anyOf": [
       {
        "type": "string"
@@ -488,6 +543,17 @@
       }
      ],
      "default": null
+    },
+    "paid_today_to_payee": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null
     }
    },
    "required": [
@@ -563,6 +629,17 @@
      "default": null
     },
     "allowed_recipients": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null
+    },
+    "paid_today_to_payee": {
      "anyOf": [
       {
        "type": "string"

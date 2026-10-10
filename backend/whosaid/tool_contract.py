@@ -17,6 +17,7 @@ TRUSTED_PARAMS: tuple[str, ...] = (
     "sender_id",  # who sent it
     "sender_trust",  # TrustLevel value, computed in code
     "registered_payee",  # the sender's registered UPI ID, if any ("" when none)
+    "paid_today_to_payee",  # decimal string: INR already paid by this user to this payee (from the ledger), the cumulative-limit input
     "allowed_recipients",  # comma-separated ids of the receiving user's existing contacts (the only valid forward targets)
 )
 

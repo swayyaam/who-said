@@ -17,6 +17,7 @@ from whosaid.agent.prompts import SYSTEM_PROMPT, build_user_prompt, derive_nonce
 from whosaid.agent.tool_gateway import GatewayResult, TaskInfo, ToolDescriptor, ToolGateway
 from whosaid.errors import GatewayError, LLMError
 from whosaid.events import Emitter, noop_emit
+from whosaid.ledger import NoLedger, PaidReader
 from whosaid.llm.base import LLMClient, ProposedToolCall
 from whosaid.logging_setup import log_event
 from whosaid.schemas import AgentTrace, AuthzDecision, EventType, Message, RoutingDecision, SenderTrust, ToolAttempt, ToolCall
@@ -35,9 +36,11 @@ def to_openai_tools(tools: list[ToolDescriptor]) -> list[dict[str, Any]]:
     ]
 
 
-def build_trusted_args(message: Message, trust: SenderTrust) -> dict[str, Any]:
+def build_trusted_args(message: Message, trust: SenderTrust, paid_today_to_payee: float = 0.0) -> dict[str, Any]:
+    # paid_today_to_payee is a decimal string ("4000.00"): the AgntID runtime types every parameter as a string.
     """Trust context for a call, computed from data. The model never supplies any of it."""
     return {
+        "paid_today_to_payee": f"{paid_today_to_payee:.2f}",
         "user_id": message.user_id,
         "message_id": message.message_id,
         "sender_id": trust.sender.sender_id,
@@ -52,9 +55,14 @@ def task_intent(trust: SenderTrust, routing: RoutingDecision | None = None) -> s
     return build_task_intent(trust, routing)
 
 
+# What the model is told when a call is denied. The real reason (AgntID's decision and our readable label) goes to the
+# results, dashboard and logs only: the model's replies reach the sender, so policy details must not reach the model.
+GENERIC_DENIAL = "This action is not permitted."
+
+
 def _tool_message_for_model(call_id: str, attempt: ToolAttempt, gw: GatewayResult) -> dict[str, Any]:
     if not gw.decision.allowed:
-        body: dict[str, Any] = {"status": "denied", "reason": gw.decision.reason}
+        body: dict[str, Any] = {"status": "denied", "reason": GENERIC_DENIAL}
     elif gw.result is not None:
         body = gw.result
     else:
@@ -70,11 +78,14 @@ async def _execute(
     gateway: ToolGateway,
     known_tools: set[str],
     emit: Emitter,
+    ledger: PaidReader,
 ) -> tuple[ToolAttempt, GatewayResult]:
     model_args, dropped = strip_trusted(proposed.arguments)
     if dropped:
         log_event("agent.trusted_param_stripped", message_id=message.message_id, tool=proposed.name, dropped=dropped)
-    call = ToolCall(tool=proposed.name, model_args=model_args, trusted_args=build_trusted_args(message, trust))
+    # The cumulative-limit input: what this user already paid THIS payee. Computed from the ledger, hidden from the model.
+    paid = await ledger.paid_to(message.user_id, str(model_args.get("payee_upi", ""))) if proposed.name == "pay_upi" else 0.0
+    call = ToolCall(tool=proposed.name, model_args=model_args, trusted_args=build_trusted_args(message, trust, paid))
 
     if proposed.name not in known_tools:
         decision = AuthzDecision(allowed=False, tool=proposed.name, source="agent", enforced=False,
@@ -108,6 +119,7 @@ async def run_agent(
     max_turns: int = 4,
     emit: Emitter = noop_emit,
     routing: RoutingDecision | None = None,
+    ledger: PaidReader | None = None,
 ) -> AgentTrace:
     """Run the agent on one message. Never raises for LLM or gateway failure: the error is recorded."""
     started = time.perf_counter()
@@ -142,7 +154,7 @@ async def run_agent(
                 messages.append(result.assistant_message)
                 for proposed in result.tool_calls:
                     attempt, gw = await _execute(proposed, message=message, trust=trust, gateway=gateway,
-                                                 known_tools=known, emit=emit)
+                                                 known_tools=known, emit=emit, ledger=ledger or NoLedger())
                     trace.attempts.append(attempt)
                     messages.append(_tool_message_for_model(proposed.id, attempt, gw))
         finally:

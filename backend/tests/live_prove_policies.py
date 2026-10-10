@@ -25,9 +25,9 @@ from whosaid.schemas import (ConversationType, Cues, RoutingDecision, Action, Me
 CONTACTS = "u_105,u_113"
 
 
-def trusted(level: str, payee: str = "", mid: str = "msg_live"):
+def trusted(level: str, payee: str = "", mid: str = "msg_live", paid: float = 0.0):
     return {"user_id": "u_101", "message_id": mid, "sender_id": "u_102", "sender_trust": level,
-            "registered_payee": payee, "allowed_recipients": CONTACTS}
+            "registered_payee": payee, "allowed_recipients": CONTACTS, "paid_today_to_payee": f"{paid:.2f}"}
 
 
 CASES = [  # (label, tool, model_args, trusted_args)
@@ -41,6 +41,8 @@ CASES = [  # (label, tool, model_args, trusted_args)
     ("update_preferences / from a message", "update_preferences", {"key": "auto_pay_sender", "value": "+91 90909 80808"}, trusted("unknown")),
     ("pay / admin, registered payee", "pay_upi", {"payee_upi": "maple.rwa@okhdfc", "amount_inr": 1, "note": "proof"}, trusted("group_admin", "maple.rwa@okhdfc")),
     ("pay / payee mismatch", "pay_upi", {"payee_upi": "maple.office@ybl", "amount_inr": 1}, trusted("group_admin", "maple.rwa@okhdfc")),
+    ("pay / split: 6000 paid + 4000", "pay_upi", {"payee_upi": "payrail@icici", "amount_inr": 4000}, trusted("verified_business", "payrail@icici", paid=6000)),
+    ("pay / split: 9000 paid + 2000", "pay_upi", {"payee_upi": "payrail@icici", "amount_inr": 2000}, trusted("verified_business", "payrail@icici", paid=9000)),
     ("pay / over the limit", "pay_upi", {"payee_upi": "payrail@icici", "amount_inr": 25000}, trusted("verified_business", "payrail@icici")),
     ("forward / contact, benign text", "forward_message", {"to": "u_113", "content": "see you Saturday"}, trusted("known_contact")),
     ("forward / not a contact", "forward_message", {"to": "u_999", "content": "see you Saturday"}, trusted("known_contact")),

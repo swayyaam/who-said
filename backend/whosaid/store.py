@@ -112,6 +112,12 @@ class Store:
             self._preferences[user_id] = updated
             return updated.model_copy(deep=True)
 
+    def paid_to(self, user_id: str, payee: str) -> float:
+        """INR this user has already paid to this payee, from the ledger (successful payments only)."""
+        with self._lock:
+            return round(sum(e.amount_inr for e in self._ledger
+                             if e.tool == "pay_upi" and e.status == "ok" and e.user_id == user_id and e.details.get("paid_to") == payee), 2)
+
     def otp_messages(self, user_id: str) -> list[str]:
         return [default_otp_message(user_id)]
 

@@ -17,11 +17,13 @@ Every decision records its layer (`profile` / `policy` / `intent`); results and 
 
 1. **Unknown sender:** no write actions (`reply`, `forward_message`, `create_calendar_event`, `pay_upi`). `block_sender` is allowed.
 2. **Known contact:** `reply`, `create_calendar_event`, and `forward_message` only to one of the user's existing contacts (`allowed_recipients`) and never OTP-like content.
-3. **Group admin or verified business:** the above plus `pay_upi`, only to the sender's **registered payee** and only up to **10,000 INR**.
+3. **Group admin or verified business:** the above plus `pay_upi`, only to the sender's **registered payee**, and only while the **cumulative total paid to that payee** (this payment plus `paid_today_to_payee` from the ledger) stays within **10,000 INR**, so splitting a payment cannot get around the limit.
 4. **`update_preferences`** is denied whenever the call originates from an incoming message (always, for the agent).
 5. **`read_otp_messages`** is never available to the agent (profile layer).
 
-The trust level, registered payee and contact list are computed **in code from data** and injected as tool arguments after the model proposes a call. The model never sees or sets them (tested): `sender_trust`, `registered_payee`, `allowed_recipients`, `sender_id`, `user_id`, `message_id`.
+The trust level, registered payee and contact list are computed **in code from data** and injected as tool arguments after the model proposes a call. The model never sees or sets them (tested): `sender_trust`, `registered_payee`, `allowed_recipients`, `paid_today_to_payee`, `sender_id`, `user_id`, `message_id`.
+
+Denials never reach the model: it is told only "This action is not permitted." (it talks to the sender, so policy details must not leak), and the system prompt forbids mentioning limits or suggesting workarounds. The full AgntID reason and our readable label go to results, the dashboard and logs.
 
 ## What is configured in the portal
 

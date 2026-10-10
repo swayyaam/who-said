@@ -186,6 +186,9 @@ class InProcessAdmin:
     def get_preferences(self, user_id):
         return self._store.get_preferences(user_id)
 
+    def paid_to(self, user_id, payee):
+        return self._store.paid_to(user_id, payee)
+
     def put_preferences(self, user_id, prefs):
         return self._store.set_preferences(user_id, prefs)
 
@@ -219,6 +222,11 @@ class InProcessBackend:
 
         cache = ContentCache(Path(tempfile.mkdtemp()), read_only_fallbacks=(DEMO_FIXTURE_DIR,))
         return CachedLLM(FixtureOnlyClient("qwen3.5:2b-mlx"), cache, provider="ollama", reasoning_effort="none")
+
+    def ledger_reader(self):
+        from whosaid.mcp_server.admin import ServerLedgerReader
+
+        return ServerLedgerReader(self.admin)
 
     def health(self):
         return {"tool_server": {"healthy": True}, "agntid": {"endpoint": "test://agntid", "reachable": self._reachable},

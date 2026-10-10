@@ -44,6 +44,10 @@ def explain_denial(tool: str, args: dict[str, Any]) -> str | None:
             return f"DENIED {tool}: amount {amount:,.0f} INR exceeds the limit of {PAYMENT_LIMIT_INR:,} INR"
         if amount <= 0:
             return f"DENIED {tool}: amount must be positive"
+        paid = float(args.get("paid_today_to_payee") or 0)
+        if paid + amount > PAYMENT_LIMIT_INR:
+            return (f"DENIED {tool}: {amount:,.0f} INR plus {paid:,.0f} INR already paid today to this payee "
+                    f"exceeds the daily limit of {PAYMENT_LIMIT_INR:,} INR")
     return None
 
 

@@ -21,7 +21,7 @@ from whosaid.errors import WhoSaidError
 from whosaid.ingest import load_dataset_dir
 from whosaid.llm import build_llm
 from whosaid.logging_setup import setup_logging
-from whosaid.mcp_server.admin import ServerPreferenceReader, ToolServerAdmin, ensure_tool_server
+from whosaid.mcp_server.admin import ServerLedgerReader, ServerPreferenceReader, ToolServerAdmin, ensure_tool_server
 from whosaid.profile import Preferences, PreferenceError, apply_update, seed_book
 from whosaid.pipeline import run_dataset
 from whosaid.report import render_comparison, render_result, render_summary
@@ -46,7 +46,7 @@ async def _run(args: argparse.Namespace, settings: Settings, console: Console, *
             admin.reset_and_seed(dataset.preferences)
             results = await run_dataset(
                 dataset, llm=llm, gateway_factory=gateway_factory(settings, enforcement), settings=settings,
-                preferences=ServerPreferenceReader(admin), profile_params=profile_params(settings),
+                preferences=ServerPreferenceReader(admin), profile_params=profile_params(settings), ledger=ServerLedgerReader(admin),
                 on_result=None if quiet else (lambda r: render_result(console, r)), only=set(args.only) if args.only else None,
                 limit=args.limit, concurrency=args.concurrency,
             )

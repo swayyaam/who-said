@@ -44,6 +44,11 @@ class ToolServerAdmin:
         resp.raise_for_status()
         return Preferences.model_validate(resp.json())
 
+    def paid_to(self, user_id: str, payee: str) -> float:
+        resp = httpx.get(f"{self._base}/_admin/paid", params={"user_id": user_id, "payee": payee}, timeout=5)
+        resp.raise_for_status()
+        return float(resp.json()["paid_inr"])
+
     def reset_and_seed(self, preferences: dict[str, Preferences]) -> None:
         """Start a run from a known state: wipe the store, then load the dataset's explicit preferences."""
         self.reset()
@@ -64,6 +69,16 @@ class ServerPreferenceReader:
 
     async def get(self, user_id: str) -> Preferences:
         return await asyncio.to_thread(self._admin.get_preferences, user_id)
+
+
+class ServerLedgerReader:
+    """Reads what a user has already paid a payee from the tool server's ledger (a hidden, code-injected input)."""
+
+    def __init__(self, admin: ToolServerAdmin) -> None:
+        self._admin = admin
+
+    async def paid_to(self, user_id: str, payee: str) -> float:
+        return await asyncio.to_thread(self._admin.paid_to, user_id, payee)
 
 
 @contextmanager
