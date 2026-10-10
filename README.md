@@ -5,3 +5,29 @@
 A message-routing agent for WhatsApp that decides notify / digest / mute **and acts on the
 message on the user's behalf**, with every tool call gated by AgntID according to *who sent
 the message*. Backend only for now; see `backend/`.
+
+## Running the demo
+
+macOS, one command:
+
+```bash
+scripts/demo.sh            # start everything, reset demo state, open the dashboard
+scripts/demo.sh --live     # demo runs use the live model instead of the recorded fixture
+scripts/demo.sh --mock     # frontend only, on mock data (no Docker, runtime, tool server or API)
+scripts/demo.sh --detach   # return once everything is up instead of staying in the foreground
+scripts/demo.sh --no-open  # do not open the browser
+scripts/stop.sh            # stop tool server, API and frontend
+scripts/stop.sh --all      # also stop Ollama (if demo.sh started it) and the AgntID runtime
+```
+
+`demo.sh` starts Docker Desktop, the AgntID runtime (`~/agntid-runtime`), Ollama (warn only if
+missing), the tool server (:8765), the API (:8000) and the frontend (:5173), checks each one,
+resets demo state and prints a status table. It is idempotent: healthy services are reused, and
+if a port is held by something unhealthy it names the process and stops. In the foreground,
+Ctrl+C stops the tool server, API and frontend; the Docker runtime stays up.
+
+Prerequisites: Docker Desktop, the AgntID runtime set up in `~/agntid-runtime`, `backend/.env`
+filled in (see `backend/.env.example`), `backend/.venv`, and `npm install` in `frontend/`.
+
+Logs and PID files are in `logs/` (gitignored). Set `DEMO_WEB_PORT` to use a different frontend
+port. A frontend you started yourself is reused as-is (its data mode is not known to the script).

@@ -18,3 +18,6 @@ __pycache__/
 .cache/
 runs/
 .DS_Store
+
+# demo launcher logs and PID files
+logs/

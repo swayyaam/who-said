@@ -40,7 +40,8 @@ SSE_KEEPALIVE_SECONDS = 15
 class RunRequest(BaseModel):
     dataset_id: str
     enforcement: Enforcement
-    live: bool = Field(False, description="True calls the model. False replays the committed demo fixture (demo dataset only).")
+    live: bool | None = Field(None, description="True calls the model. False replays the committed demo fixture (demo dataset only). "
+                                                "Omitted: the server's DEFAULT_LIVE setting (false unless started with demo.sh --live).")
     concurrency: int | None = Field(None, ge=1, le=8)
     only: list[str] | None = Field(None, description="Run just these message ids")
 
@@ -115,7 +116,8 @@ def create_app(settings: Settings | None = None, backend: Backend | None = None)
         if dataset is None:
             raise HTTPException(404, detail=f"no dataset {req.dataset_id!r}")
         is_demo = state.datasets.is_demo(req.dataset_id)
-        live = req.live or not is_demo  # only the demo has a fixture; anything else needs the model
+        requested = settings.default_live if req.live is None else req.live
+        live = requested or not is_demo  # only the demo has a fixture; anything else needs the model
         if req.enforcement is Enforcement.ON:
             health_ = await asyncio.to_thread(backend.health)
             if not health_.get("agntid", {}).get("reachable", True):

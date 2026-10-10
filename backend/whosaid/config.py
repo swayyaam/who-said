@@ -61,6 +61,8 @@ class Settings(BaseModel):
     api_host: str = "127.0.0.1"
     api_port: int = 8000
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"  # the Vite dev server
+    # When a run request does not say, use the live model instead of the committed demo fixture (scripts/demo.sh --live).
+    default_live: bool = False
 
     # Behaviour
     payment_limit_inr: float = 10_000.0
@@ -126,6 +128,7 @@ def load_settings(env_file: Path | None = None) -> Settings:
         api_host=_env("API_HOST", d.api_host),
         api_port=int(_env("API_PORT", str(d.api_port))),
         cors_origins=_env("CORS_ORIGINS", d.cors_origins),
+        default_live=_env("DEFAULT_LIVE", "false").lower() in {"1", "true", "yes"},
         payment_limit_inr=float(_env("PAYMENT_LIMIT_INR", str(d.payment_limit_inr))),
         agent_concurrency=int(_env("AGENT_CONCURRENCY", str(d.agent_concurrency))),
         cache_dir=Path(_env("CACHE_DIR", str(d.cache_dir))),
