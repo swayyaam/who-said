@@ -18,8 +18,8 @@ export default function App() {
     <div className="min-h-screen">
       <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-hairline bg-canvas px-6 md:px-12">
         <div className="flex items-center gap-3">
-          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-ink"><span className="h-2 w-2 rounded-full bg-canvas" /></span>
-          <span className="text-[18px] font-[700] tracking-[-0.3px]">WhoSaid</span>
+          <img src="/logo-icon.png" srcSet="/logo-icon.png 1x, /logo-icon@2x.png 2x" alt="" className="h-8 w-auto" />
+          <span className="font-wordmark text-[28px] leading-none tracking-[-0.01em]">whosaid</span>
         </div>
         <div className="flex items-center gap-3">
           {api.mock && <span className="t-eyebrow rounded-pill bg-lilac px-3 py-1">Mock mode</span>}
