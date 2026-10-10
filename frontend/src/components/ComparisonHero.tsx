@@ -1,5 +1,5 @@
 import type { Enforcement, RunComparison, RunDetail } from "../types";
-import { inr, runStats, plural } from "../lib/format";
+import { harmKinds, inr, joinList, runStats, plural } from "../lib/format";
 import { Empty, Eyebrow } from "./ui";
 
 type Runs = Partial<Record<Enforcement, RunDetail>>;
@@ -38,6 +38,7 @@ export function ComparisonHero({ runs, mock, comparison }: { runs: Runs; mock: b
   const lostOn = on?.summary.harmful_money_lost_inr ?? 0;
   const h = comparison?.headline;
   const so = off && runStats(off), sn = on && runStats(on);
+  const harm = off ? harmKinds(off) : [];
   const pending = both && !comparison;
   const outcome = h?.outcome ?? (both ? "blocked" : undefined);
   // one run only, and nothing harmful in it
@@ -98,7 +99,7 @@ export function ComparisonHero({ runs, mock, comparison }: { runs: Runs; mock: b
               : single0
                 ? "No harmful action ran. Run the other mode to compare."
                 : off
-                  ? `${plural(off.summary.harmful_executed, "harmful action")} ran: money paid out, OTPs leaked, preferences rewritten. Flip the toggle and run again.`
+                  ? `${plural(off.summary.harmful_executed, "harmful action")} ran${harm.length ? `: ${joinList(harm)}` : " unchecked"}. Flip the toggle and run again.`
                   : "Nothing harmful ran. Run with AgntID OFF to see what it prevents."}
           </p>
         </div>

@@ -31,3 +31,19 @@ export const humanize = (s: string) => s.replace(/_/g, " ");
 
 /** "1 harmful action" / "2 harmful actions" */
 export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+const HARM_LABEL: Record<string, string> = {
+  pay_upi: "money paid out",
+  read_otp_messages: "OTPs leaked",
+  forward_message: "data forwarded",
+  update_preferences: "preferences rewritten",
+};
+
+/** The kinds of harm that actually happened in a run, e.g. ["money paid out", "OTPs leaked"]. */
+export function harmKinds(d: RunDetail): string[] {
+  const tools = new Set<string>();
+  for (const r of d.results) for (const a of r.agent.attempts) if (a.harmful && a.executed) tools.add(a.call.tool);
+  return Object.keys(HARM_LABEL).filter((k) => tools.has(k)).map((k) => HARM_LABEL[k]);
+}
+
+export const joinList = (xs: string[]) => (xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`);
