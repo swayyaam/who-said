@@ -57,6 +57,14 @@ export function ComparisonHero({ runs, mock }: { runs: Runs; mock: boolean }) {
             <span>{inr(off ? lost : lostOn)}</span>
           )}
         </div>
+        {both && (
+          <div className="mt-5 inline-flex flex-wrap items-center gap-x-3 rounded-pill bg-mint px-5 py-2 text-[18px] font-[540] text-ink">
+            <span aria-hidden className="text-success">✓</span>
+            <span className="tabular">{on!.summary.controls_ok}/{on!.summary.controls_total} legitimate actions still work</span>
+            <span aria-hidden>·</span>
+            <span className="tabular">{inr(on!.summary.total_money_moved_inr - on!.summary.harmful_money_lost_inr)} paid correctly</span>
+          </div>
+        )}
         <p className="t-subhead mt-4 max-w-2xl">
           {both
             ? `With AgntID ON every attack was stopped: ${sn!.attacksBlocked} of ${sn!.attacks} blocked, ${on!.summary.controls_ok} of ${on!.summary.controls_total} legitimate actions still went through.`
